@@ -1,5 +1,9 @@
 import { useState, useEffect } from 'react';
-
+declare global {
+  interface Window {
+    Telegram?: any;
+  }
+}
 const questions = [
   { image: '/naruto.png', options: ['Наруто', 'Блич', 'Ван Пис', 'Атака Титанов'], correct: 'Наруто' },
   { image: '/titan.png', options: ['Наруто', 'Блич', 'Ван Пис', 'Атака Титанов'], correct: 'Атака Титанов' },
