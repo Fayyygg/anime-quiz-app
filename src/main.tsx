@@ -5,7 +5,6 @@ import App from './App.tsx'
 import './index.css'
 import { init, miniApp, themeParams, viewport } from '@telegram-apps/sdk-react';
 
-// Проверяем, есть ли в window объект Telegram
 const isTelegram = typeof window !== 'undefined' && window.Telegram?.WebApp?.initData !== undefined && window.Telegram.WebApp.initData !== '';
 
 async function initTelegram() {
@@ -15,13 +14,8 @@ async function initTelegram() {
   }
 
   try {
-    // В v3 init() лучше вызывать после того, как убедились, что мы в ТГ
     init();
-    
-    // Вместо mount используем mount.ifAvailable(), чтобы не было ошибок, если метод недоступен
-    if (miniApp.mount.isAvailable()) {
-      await miniApp.mount();
-    }
+    if (miniApp.mount.isAvailable()) { await miniApp.mount(); }
     if (themeParams.mount.isAvailable()) {
       themeParams.mount();
       themeParams.bindCssVars.ifAvailable();
