@@ -1,4 +1,7 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
+
+// ВСТАВЛЕН ТВОЙ BLOCK ID ИЗ ADSGRAM
+const ADSGRAM_BLOCK_ID = "58781";
 
 const questions = [
   { image: '/naruto.png', options: ['Наруто', 'Блич', 'Ван Пис', 'Атака Титанов'], correct: 'Наруто' },
@@ -16,17 +19,11 @@ function App() {
   const [score, setScore] = useState(0);
   const [coins, setCoins] = useState(4320);
   const [timeLeft, setTimeLeft] = useState(15);
+  const [hiddenOptions, setHiddenOptions] = useState<string[]>([]); // Для подсказок
 
   const question = questions[currentQuestionIndex];
 
-  const correctAudio = useRef<HTMLAudioElement | null>(null);
-  const wrongAudio = useRef<HTMLAudioElement | null>(null);
-
-  useEffect(() => {
-    correctAudio.current = new Audio('/correct.mp3');
-    wrongAudio.current = new Audio('/wrong.mp3');
-  }, []);
-
+  // Логика таймера
   useEffect(() => {
     if (gameState !== 'playing' || selectedAnswer !== null) return;
     if (timeLeft === 0) {
@@ -44,6 +41,7 @@ function App() {
     setSelectedAnswer(null);
     setScore(0);
     setTimeLeft(15);
+    setHiddenOptions([]); // Сбрасываем подсказки
   };
 
   const handleAnswer = (option: string) => {
@@ -64,9 +62,30 @@ function App() {
       setCurrentQuestionIndex(currentQuestionIndex + 1);
       setSelectedAnswer(null);
       setTimeLeft(15);
+      setHiddenOptions([]); // Сбрасываем подсказки для нового вопроса
     } else {
       setGameState('end');
     }
+  };
+
+  // --- ЛОГИКА РЕКЛАМЫ (ПОДСКАЗКИ) ---
+  const handleHint = () => {
+    const AdController = (window as any).Adsgram?.init({ blockId: ADSGRAM_BLOCK_ID });
+
+    if (!AdController) {
+      alert("Реклама пока не загрузилась. Попробуйте позже.");
+      return;
+    }
+
+    AdController.show().then((result: any) => {
+      if (result.done) {
+        // Если досмотрел - убираем 2 неправильных ответа
+        const wrongOptions = question.options.filter(opt => opt !== question.correct);
+        setHiddenOptions(wrongOptions.slice(0, 2));
+      }
+    }).catch((err: any) => {
+      console.log("Реклама не была досмотрена", err);
+    });
   };
 
   // --- ЭКРАН 1: ГЛАВНЫЙ ---
@@ -313,23 +332,18 @@ function App() {
       <h2 style={{ fontSize: '20px', fontWeight: 'bold', textAlign: 'center', marginBottom: '25px', lineHeight: '1.3' }}>Из какого аниме<br/>этот персонаж?</h2>
 
       <div style={{ display: 'grid', gap: '12px', flexGrow: 1 }}>
-        {question.options.map((opt) => (
-          <button 
-            key={opt} 
-            onClick={() => handleAnswer(opt)}
-            style={{ 
-              padding: '18px 20px', fontSize: '16px', fontWeight: '600', color: 'white', 
-              background: '#151515', border: '1px solid #333', borderRadius: '12px', 
-              cursor: 'pointer', textAlign: 'center', transition: 'all 0.2s'
-            }}
-          >
-            {opt}
-          </button>
-        ))}
+        {question.options.map((opt) => {
+          if (hiddenOptions.includes(opt)) return null;
+          return (
+            <button key={opt} onClick={() => handleAnswer(opt)} style={{ padding: '18px 20px', fontSize: '16px', fontWeight: '600', color: 'white', background: '#151515', border: '1px solid #333', borderRadius: '12px', cursor: 'pointer', textAlign: 'center', transition: 'all 0.2s' }}>
+              {opt}
+            </button>
+          );
+        })}
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginTop: '20px' }}>
-        <button style={{ background: '#151515', border: '1px solid #ff3b30', borderRadius: '12px', padding: '15px', color: '#ff3b30', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', fontSize: '14px', fontWeight: 'bold', cursor: 'pointer' }}><span style={{ fontSize: '18px' }}>💡</span> Подсказка (50 🪙)</button>
+        <button onClick={handleHint} style={{ background: '#151515', border: '1px solid #ff3b30', borderRadius: '12px', padding: '15px', color: '#ff3b30', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', fontSize: '14px', fontWeight: 'bold', cursor: 'pointer' }}><span style={{ fontSize: '18px' }}>💡</span> Подсказка (Реклама)</button>
         <button style={{ background: '#151515', border: '1px solid #333', borderRadius: '12px', padding: '15px', color: '#888', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', fontSize: '14px', fontWeight: 'bold', cursor: 'pointer' }}><span style={{ fontSize: '18px' }}>⏭</span> Пропустить (100 🪙)</button>
       </div>
 
