@@ -22,7 +22,6 @@ const animeList = [
 ];
 
 const QUESTION_COUNT = 10;
-
 const shuffle = (array: any[]) => [...array].sort(() => Math.random() - 0.5);
 
 const generateQuestions = () => {
@@ -65,9 +64,8 @@ function App() {
   const [timeLeft, setTimeLeft] = useState(15);
   
   const [profile, setProfile] = useState<any>(null);
-  const [leaders, setLeaders] = useState<any[]>([]); // Пока оставим пустым, так как нет базы для лидеров
 
-  // Загрузка профиля из Telegram
+  // Загрузка профиля (пока просто из Telegram)
   useEffect(() => {
     const tg = (window as any).Telegram?.WebApp;
     const user = tg?.initDataUnsafe?.user;
@@ -76,7 +74,7 @@ function App() {
       setProfile({
         id: user.id,
         first_name: user.first_name,
-        coins: 0, // Тут должны быть данные из базы, но у нас пока нет функции загрузки
+        coins: 0,
         total_wins: 0
       });
     }
@@ -138,7 +136,6 @@ function App() {
             })
           });
           
-          // Обновляем локальный стейт, чтобы монеты сразу отобразились
           setProfile({ ...profile, coins: newCoins, total_wins: newWins });
         } catch (e) {
           console.error("Ошибка сохранения", e);
