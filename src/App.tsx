@@ -264,6 +264,20 @@ function App() {
     }
   };
 
+  const renderBottomNavigation = (activeScreen: Screen) => (
+    <nav className="bottom-navigation" aria-label="Основная навигация">
+      <button type="button" className={`nav-action bottom-nav__item${activeScreen === 'start' ? ' is-active' : ''}`} aria-current={activeScreen === 'start' ? 'page' : undefined} onClick={() => setGameState('start')}>
+        <span className="bottom-nav__icon">🏠</span><span className="bottom-nav__label">Главная</span>
+      </button>
+      <button type="button" className={`nav-action bottom-nav__item${activeScreen === 'profile' ? ' is-active' : ''}`} aria-current={activeScreen === 'profile' ? 'page' : undefined} onClick={openStats}>
+        <span className="bottom-nav__icon">👤</span><span className="bottom-nav__label">Профиль</span>
+      </button>
+      <button type="button" className={`nav-action bottom-nav__item${activeScreen === 'settings' ? ' is-active' : ''}`} aria-current={activeScreen === 'settings' ? 'page' : undefined} onClick={() => setGameState('settings')}>
+        <span className="bottom-nav__icon">⚙️</span><span className="bottom-nav__label">Настройки</span>
+      </button>
+    </nav>
+  );
+
   if (profileLoading) {
     return (
       <div className="loading-screen">
@@ -278,7 +292,7 @@ function App() {
   // --- ЭКРАН 1: ГЛАВНЫЙ ---
   if (gameState === 'start') {
     return (
-      <div className="screen-enter" style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', position: 'relative', background: 'radial-gradient(circle at 50% 30%, #4a0000 0%, #0a0a0a 80%)', padding: '20px', overflow: 'hidden' }}>
+      <div className="screen-enter" style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', position: 'relative', background: 'radial-gradient(circle at 50% 30%, #4a0000 0%, #0a0a0a 80%)', padding: '20px 20px 96px', overflow: 'hidden' }}>
         <div style={{ position: 'absolute', top: '10%', right: '-10%', fontSize: '200px', opacity: 0.05, transform: 'rotate(15deg)', zIndex: 0 }}>⚔️</div>
         <div style={{ position: 'absolute', bottom: '20%', left: '-10%', fontSize: '200px', opacity: 0.05, transform: 'rotate(-15deg)', zIndex: 0 }}>🌸</div>
 
@@ -322,11 +336,7 @@ function App() {
           </button>
         </div>
 
-        <div style={{ display: 'flex', justifyContent: 'space-between', padding: '15px 30px 0', borderTop: '1px solid #222', zIndex: 10 }}>
-          <button type="button" className="nav-action" onClick={() => setGameState('start')} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', color: '#ff3b30', cursor: 'pointer' }}><span style={{ fontSize: '22px' }}>🏠</span><span style={{ fontSize: '10px', marginTop: '4px', fontWeight: 'bold' }}>Главная</span></button>
-          <button type="button" className="nav-action" onClick={openStats} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', color: '#555', cursor: 'pointer' }}><span style={{ fontSize: '22px' }}>👤</span><span style={{ fontSize: '10px', marginTop: '4px' }}>Профиль</span></button>
-          <button type="button" className="nav-action" onClick={() => setGameState('settings')} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', color: '#555', cursor: 'pointer' }}><span style={{ fontSize: '22px' }}>⚙️</span><span style={{ fontSize: '10px', marginTop: '4px' }}>Настройки</span></button>
-        </div>
+        {renderBottomNavigation('start')}
       </div>
     );
   }
@@ -334,7 +344,7 @@ function App() {
   // --- ЭКРАН: СТАТИСТИКА ---
   if (gameState === 'profile') {
     return (
-      <div className="screen-enter" style={{ minHeight: '100vh', background: '#0a0a0a', padding: '20px', display: 'flex', flexDirection: 'column' }}>
+      <div className="screen-enter" style={{ minHeight: '100vh', background: '#0a0a0a', padding: '20px 20px 96px', display: 'flex', flexDirection: 'column' }}>
         <div style={{ display: 'flex', alignItems: 'center', marginBottom: '30px' }}>
           <button onClick={() => setGameState('start')} style={{ background: 'transparent', border: 'none', color: 'white', fontSize: '24px', cursor: 'pointer', marginRight: '15px' }}>←</button>
           <h2 style={{ fontSize: '20px', fontWeight: 'bold' }}>👤 Профиль</h2>
@@ -384,6 +394,7 @@ function App() {
             </div>
           </div>
         </div>
+        {renderBottomNavigation('profile')}
       </div>
     );
   }
@@ -391,7 +402,7 @@ function App() {
   // --- ЭКРАН: ЕЖЕДНЕВНОЕ ЗАДАНИЕ ---
   if (gameState === 'daily') {
     return (
-      <div className="screen-enter" style={{ minHeight: '100vh', background: '#0a0a0a', padding: '20px', display: 'flex', flexDirection: 'column', color: 'white' }}>
+      <div className="screen-enter" style={{ minHeight: '100vh', background: '#0a0a0a', padding: '20px 20px 96px', display: 'flex', flexDirection: 'column', color: 'white' }}>
         <div style={{ display: 'flex', alignItems: 'center', marginBottom: '30px' }}>
           <button onClick={() => setGameState('start')} style={{ background: 'transparent', border: 'none', color: 'white', fontSize: '24px', cursor: 'pointer', marginRight: '15px' }}>←</button>
           <h2 style={{ fontSize: '20px', fontWeight: 'bold' }}>📅 Задания</h2>
@@ -429,6 +440,7 @@ function App() {
         </div>
 
         {rewardMessage && <p role="status" style={{ color: '#ccc', fontSize: '13px', lineHeight: '1.5', marginTop: '14px', textAlign: 'center' }}>{rewardMessage}</p>}
+        {renderBottomNavigation('daily')}
       </div>
     );
   }
@@ -436,7 +448,7 @@ function App() {
   // --- ЭКРАН: НАСТРОЙКИ ---
   if (gameState === 'settings') {
     return (
-      <div className="screen-enter" style={{ minHeight: '100vh', background: '#0a0a0a', padding: '20px', display: 'flex', flexDirection: 'column' }}>
+      <div className="screen-enter" style={{ minHeight: '100vh', background: '#0a0a0a', padding: '20px 20px 96px', display: 'flex', flexDirection: 'column' }}>
         <div style={{ display: 'flex', alignItems: 'center', marginBottom: '30px' }}>
           <button onClick={() => setGameState('start')} style={{ background: 'transparent', border: 'none', color: 'white', fontSize: '24px', cursor: 'pointer', marginRight: '15px' }}>←</button>
           <h2 style={{ fontSize: '20px', fontWeight: 'bold' }}>⚙️ Настройки</h2>
@@ -445,6 +457,7 @@ function App() {
           <span style={{ fontSize: '60px', marginBottom: '20px', opacity: 0.5 }}>⚙️</span>
           <p>Этот раздел скоро появится...</p>
         </div>
+        {renderBottomNavigation('settings')}
       </div>
     );
   }
@@ -452,7 +465,7 @@ function App() {
   // --- ЭКРАН: ТАБЛИЦА ЛИДЕРОВ (пока заглушка) ---
   if (gameState === 'leaderboard') {
     return (
-      <div className="screen-enter" style={{ minHeight: '100vh', background: '#0a0a0a', padding: '20px', display: 'flex', flexDirection: 'column', color: 'white' }}>
+      <div className="screen-enter" style={{ minHeight: '100vh', background: '#0a0a0a', padding: '20px 20px 96px', display: 'flex', flexDirection: 'column', color: 'white' }}>
         <div style={{ display: 'flex', alignItems: 'center', marginBottom: '30px' }}>
           <button onClick={() => setGameState('start')} style={{ background: 'transparent', border: 'none', color: 'white', fontSize: '24px', cursor: 'pointer', marginRight: '15px' }}>←</button>
           <h2 style={{ fontSize: '20px', fontWeight: 'bold' }}>🏆 Таблица лидеров</h2>
@@ -490,6 +503,7 @@ function App() {
             </div>
           ))}
         </div>
+        {renderBottomNavigation('leaderboard')}
       </div>
     );
   }
@@ -497,7 +511,7 @@ function App() {
   // --- ЭКРАН 3: КОНЕЦ ИГРЫ ---
   if (gameState === 'end') {
     return (
-      <div className="screen-enter" style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', background: 'radial-gradient(circle at 50% 10%, #3a0000 0%, #0a0a0a 60%)', padding: '20px', alignItems: 'center', justifyContent: 'center' }}>
+      <div className="screen-enter" style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', background: 'radial-gradient(circle at 50% 10%, #3a0000 0%, #0a0a0a 60%)', padding: '20px 20px 96px', alignItems: 'center', justifyContent: 'center' }}>
         <div style={{ fontSize: '80px', marginBottom: '20px', filter: 'drop-shadow(0 0 20px rgba(255, 59, 48, 0.5))' }}>🏆</div>
         <h1 style={{ fontSize: '28px', fontWeight: 'bold', textAlign: 'center', marginBottom: '10px', lineHeight: '1.2' }}>Отличный<br/>результат!</h1>
         <p style={{ color: '#888', fontSize: '16px', marginBottom: '30px' }}>Ты угадал {score} из {questions.length}</p>
@@ -512,13 +526,14 @@ function App() {
         </div>
         <button onClick={startGame} style={{ width: '100%', padding: '18px', fontSize: '18px', fontWeight: 'bold', color: 'white', background: '#ff3b30', borderRadius: '12px', border: 'none', cursor: 'pointer', boxShadow: '0 4px 15px rgba(255, 59, 48, 0.4)', marginBottom: '15px', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '10px' }}><span style={{ fontSize: '20px' }}>🔄</span> Играть снова</button>
         <button onClick={() => setGameState('start')} style={{ width: '100%', padding: '18px', fontSize: '18px', fontWeight: 'bold', color: 'white', background: '#151515', borderRadius: '12px', border: '1px solid #333', cursor: 'pointer', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '10px' }}><span style={{ fontSize: '20px' }}>🏠</span> На главную</button>
+        {renderBottomNavigation('end')}
       </div>
     );
   }
 
   // --- ЭКРАН 2: ИГРА ---
   return (
-    <div className="screen-enter" style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', background: '#0a0a0a', padding: '20px', position: 'relative' }}>
+    <div className="screen-enter" style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', background: '#0a0a0a', padding: '20px 20px 96px', position: 'relative' }}>
       
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px' }}>
         <button onClick={() => setGameState('start')} style={{ background: 'transparent', border: 'none', color: 'white', fontSize: '24px', cursor: 'pointer' }}>←</button>
@@ -590,6 +605,7 @@ function App() {
           </button>
         </div>
       )}
+      {renderBottomNavigation('playing')}
     </div>
   );
 }
