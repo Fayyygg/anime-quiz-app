@@ -65,19 +65,29 @@ function App() {
   
   const [profile, setProfile] = useState<any>(null);
 
-  // Загрузка профиля из Telegram
+  // Загрузка профиля из Telegram и базы данных Yandex
   useEffect(() => {
     const tg = (window as any).Telegram?.WebApp;
     const user = tg?.initDataUnsafe?.user;
     
-    if (user) {
-      setProfile({
-        id: user.id,
-        first_name: user.first_name,
-        coins: 0,
-        total_wins: 0
-      });
-    }
+    // Если мы в браузере (для теста), используем ID 12345
+    const userId = user ? user.id : 12345;
+    const userName = user ? user.first_name : "Тестер";
+
+    // Сначала ставим базовые данные
+    setProfile({ id: userId, first_name: userName, coins: 0, total_wins: 0 });
+
+    // Затем запрашиваем актуальные монеты из API
+    fetch(`${API_URL}/get?id=${userId}`)
+      .then(res => res.json())
+      .then(data => {
+        setProfile((prev: any) => ({ 
+          ...prev, 
+          coins: data.coins || 0, 
+          total_wins: data.total_wins || 0 
+        }));
+      })
+      .catch(err => console.error("Ошибка загрузки профиля:", err));
   }, []);
 
   const startGame = () => {
