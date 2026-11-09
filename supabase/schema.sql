@@ -19,6 +19,11 @@ alter table public.profiles alter column coins set default 0;
 alter table public.profiles alter column coins set not null;
 alter table public.profiles alter column total_wins set not null;
 alter table public.profiles alter column games_played set not null;
+alter table public.profiles add column if not exists daily_claimed_on date;
+alter table public.profiles add column if not exists subscription_reward_claimed boolean not null default false;
+update public.profiles set subscription_reward_claimed = false where subscription_reward_claimed is null;
+alter table public.profiles alter column subscription_reward_claimed set default false;
+alter table public.profiles alter column subscription_reward_claimed set not null;
 alter table public.profiles enable row level security;
 
 grant usage on schema public to anon, authenticated;
@@ -99,5 +104,69 @@ $$;
 
 revoke all on function public.record_quiz_result(bigint, integer) from public;
 grant execute on function public.record_quiz_result(bigint, integer) to anon, authenticated;
+
+create or replace function public.claim_daily_reward(p_player_id bigint)
+returns table (new_coins integer, claim_date date, claimed boolean)
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  utc_today date := (now() at time zone 'UTC')::date;
+  updated_coins integer;
+  updated_claim_date date;
+begin
+  update public.profiles as p
+  set coins = p.coins + 50,
+      daily_claimed_on = utc_today
+  where p.id = p_player_id
+    and (p.daily_claimed_on is null or p.daily_claimed_on < utc_today)
+  returning p.coins, p.daily_claimed_on into updated_coins, updated_claim_date;
+
+  if found then
+    return query select updated_coins, updated_claim_date, true;
+    return;
+  end if;
+
+  return query
+    select p.coins, p.daily_claimed_on, false
+    from public.profiles as p
+    where p.id = p_player_id;
+end;
+$$;
+
+revoke all on function public.claim_daily_reward(bigint) from public, anon, authenticated;
+grant execute on function public.claim_daily_reward(bigint) to service_role;
+
+create or replace function public.claim_subscription_reward(p_player_id bigint)
+returns table (new_coins integer, claimed boolean)
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  updated_coins integer;
+begin
+  update public.profiles as p
+  set coins = p.coins + 100,
+      subscription_reward_claimed = true
+  where p.id = p_player_id
+    and p.subscription_reward_claimed = false
+  returning p.coins into updated_coins;
+
+  if found then
+    return query select updated_coins, true;
+    return;
+  end if;
+
+  return query
+    select p.coins, false
+    from public.profiles as p
+    where p.id = p_player_id;
+end;
+$$;
+
+revoke all on function public.claim_subscription_reward(bigint) from public, anon, authenticated;
+grant execute on function public.claim_subscription_reward(bigint) to service_role;
 
 commit;

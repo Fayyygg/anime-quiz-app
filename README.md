@@ -1,10 +1,11 @@
 # React + TypeScript + Vite
 ## Подключение Supabase
-1. Выполните `supabase/schema.sql` в SQL Editor. Таблица использует Telegram ID типа `bigint`; новые профили получают 0 монет, существующие балансы не меняются.
-2. Скопируйте `.env.example` в `.env.local`, добавьте URL проекта и publishable/anon key.
-3. В Vercel добавьте те же `VITE_SUPABASE_URL` и `VITE_SUPABASE_ANON_KEY` в **Settings → Environment Variables** и запустите redeploy.
+1. Выполните обновлённый `supabase/schema.sql` в SQL Editor. Он добавит поля и функции ежедневных заданий, не сбрасывая ненулевые балансы.
+2. В Vercel → **Settings → Environment Variables** задайте `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`, `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` и `TELEGRAM_BOT_TOKEN`.
+3. Добавьте Telegram-бота администратором канала `@animequiznews`, иначе Telegram не позволит проверять подписчиков.
+4. Запустите новый deploy Vercel после добавления переменных.
 
-Политики из этой схемы открывают чтение и изменение профилей всем посетителям. Для публичной игры их нельзя считать защитой: авторитетное начисление монет требует серверной проверки Telegram `initData`.
+Ежедневный бонус составляет 50 монет и доступен раз в UTC-день. Награда за подтверждённую подписку — 100 монет один раз на игрока. Секреты `SUPABASE_SERVICE_ROLE_KEY` и `TELEGRAM_BOT_TOKEN` используются только Vercel API и никогда не должны иметь префикс `VITE_`.
 
 
 This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.

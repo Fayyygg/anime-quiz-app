@@ -20,6 +20,7 @@ const animeList = [
 ];
 
 const QUESTION_COUNT = 10;
+const hasTelegramUser = typeof window !== 'undefined' && Boolean((window as any).Telegram?.WebApp?.initDataUnsafe?.user);
 const shuffle = (array: any[]) => [...array].sort(() => Math.random() - 0.5);
 
 const generateQuestions = () => {
@@ -50,7 +51,7 @@ const generateQuestions = () => {
   return generatedQuestions;
 };
 
-type Screen = 'start' | 'playing' | 'end' | 'stats' | 'settings' | 'leaderboard' | 'daily';
+type Screen = 'start' | 'playing' | 'end' | 'profile' | 'settings' | 'leaderboard' | 'daily';
 
 function App() {
   const [gameState, setGameState] = useState<Screen>('start');
@@ -60,6 +61,7 @@ function App() {
   const [isCorrect, setIsCorrect] = useState(false);
   const [score, setScore] = useState(0);
   const [timeLeft, setTimeLeft] = useState(15);
+  const [profileLoading, setProfileLoading] = useState(hasTelegramUser);
   
   const [profile, setProfile] = useState<PlayerProfile | null>(null);
   const [leaders, setLeaders] = useState<PlayerProfile[]>([]);
@@ -68,6 +70,10 @@ function App() {
   const [weeklyActivity, setWeeklyActivity] = useState<WeeklyActivity[]>([]);
   const [weeklyActivityLoading, setWeeklyActivityLoading] = useState(false);
   const [weeklyActivityError, setWeeklyActivityError] = useState<string | null>(null);
+  const [dailyClaimed, setDailyClaimed] = useState(false);
+  const [channelClaimed, setChannelClaimed] = useState(false);
+  const [rewardLoading, setRewardLoading] = useState<'daily' | 'subscription' | null>(null);
+  const [rewardMessage, setRewardMessage] = useState<string | null>(null);
 
   // Загрузка профиля из Telegram и Supabase
   useEffect(() => {
@@ -86,7 +92,10 @@ function App() {
       .then(loadedProfile => {
         if (isMounted) startTransition(() => setProfile(loadedProfile));
       })
-      .catch(err => console.error("Ошибка загрузки профиля:", err));
+      .catch(err => console.error("Ошибка загрузки профиля:", err))
+      .finally(() => {
+        if (isMounted) setProfileLoading(false);
+      });
 
     return () => {
       isMounted = false;
@@ -109,7 +118,7 @@ function App() {
   };
 
   const openStats = async () => {
-    setGameState('stats');
+    setGameState('profile');
     setWeeklyActivityError(null);
     if (!profile) {
       setWeeklyActivity([]);
@@ -125,6 +134,80 @@ function App() {
       setWeeklyActivityError('Не удалось загрузить активность. Проверь таблицу quiz_activity в Supabase.');
     } finally {
       setWeeklyActivityLoading(false);
+    }
+  };
+
+  const openDaily = () => {
+    setGameState('daily');
+    setDailyClaimed(profile?.daily_claimed_on === new Date().toISOString().slice(0, 10));
+    setChannelClaimed(profile?.subscription_reward_claimed ?? false);
+    setRewardMessage(null);
+  };
+
+  const openChannel = () => {
+    const telegramApp = (window as any).Telegram?.WebApp;
+    if (telegramApp?.openTelegramLink) {
+      telegramApp.openTelegramLink('https://t.me/animequiznews');
+      return;
+    }
+
+    window.open('https://t.me/animequiznews', '_blank', 'noopener,noreferrer');
+  };
+
+  const claimReward = async (task: 'daily' | 'subscription') => {
+    const initData = (window as any).Telegram?.WebApp?.initData;
+    if (!initData) {
+      setRewardMessage('Открой игру через Telegram, чтобы получить награду.');
+      return;
+    }
+
+    setRewardLoading(task);
+    setRewardMessage(null);
+    try {
+      const response = await fetch('/api/rewards', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ initData, task }),
+      });
+      const result = await response.json() as {
+        error?: string
+        coins?: number
+        claimed?: boolean
+        daily_claimed_on?: string | null
+        subscription_reward_claimed?: boolean
+      };
+
+      if (!response.ok) {
+        const messages: Record<string, string> = {
+          not_subscribed: 'Сначала подпишись на канал, затем нажми «Проверить подписку».',
+          rewards_not_configured: 'Награды ещё не настроены в Vercel: добавь серверные переменные окружения.',
+          telegram_membership_check_failed: 'Не удалось проверить подписку. Добавь бота администратором канала.',
+          invalid_telegram_data: 'Данные Telegram устарели. Закрой и заново открой игру через бота.',
+        };
+        throw new Error(messages[result.error ?? ''] ?? 'Не удалось получить награду. Попробуй позже.');
+      }
+
+      if (typeof result.coins !== 'number') throw new Error('Сервер вернул некорректный баланс.');
+      setProfile(current => current ? {
+        ...current,
+        coins: result.coins!,
+        daily_claimed_on: result.daily_claimed_on ?? current.daily_claimed_on,
+        subscription_reward_claimed: result.subscription_reward_claimed ?? current.subscription_reward_claimed,
+      } : current);
+
+      if (task === 'daily') {
+        const claimed = result.claimed ?? false;
+        setDailyClaimed(Boolean(result.daily_claimed_on) || claimed);
+        setRewardMessage(claimed ? 'Ежедневный бонус: +50 монет.' : 'Бонус за сегодня уже получен.');
+      } else {
+        const claimed = result.claimed ?? false;
+        setChannelClaimed(true);
+        setRewardMessage(claimed ? 'За подписку начислено 100 монет.' : 'Бонус за подписку уже получен.');
+      }
+    } catch (error) {
+      setRewardMessage(error instanceof Error ? error.message : 'Не удалось получить награду.');
+    } finally {
+      setRewardLoading(null);
     }
   };
 
@@ -181,10 +264,21 @@ function App() {
     }
   };
 
+  if (profileLoading) {
+    return (
+      <div className="loading-screen">
+        <div className="loading-mark">AQ</div>
+        <h1 className="loading-title">ANIME <span>QUIZ</span></h1>
+        <div className="loading-track"><span /></div>
+        <p className="loading-caption">Загружаем игру</p>
+      </div>
+    );
+  }
+
   // --- ЭКРАН 1: ГЛАВНЫЙ ---
   if (gameState === 'start') {
     return (
-      <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', position: 'relative', background: 'radial-gradient(circle at 50% 30%, #4a0000 0%, #0a0a0a 80%)', padding: '20px', overflow: 'hidden' }}>
+      <div className="screen-enter" style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', position: 'relative', background: 'radial-gradient(circle at 50% 30%, #4a0000 0%, #0a0a0a 80%)', padding: '20px', overflow: 'hidden' }}>
         <div style={{ position: 'absolute', top: '10%', right: '-10%', fontSize: '200px', opacity: 0.05, transform: 'rotate(15deg)', zIndex: 0 }}>⚔️</div>
         <div style={{ position: 'absolute', bottom: '20%', left: '-10%', fontSize: '200px', opacity: 0.05, transform: 'rotate(-15deg)', zIndex: 0 }}>🌸</div>
 
@@ -201,7 +295,6 @@ function App() {
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', background: '#1c1c1e', padding: '8px 15px', borderRadius: '20px', border: '1px solid #333' }}>
             <span style={{ fontSize: '16px' }}>🪙</span>
             <span style={{ fontSize: '14px', fontWeight: 'bold' }}>{profile?.coins?.toLocaleString() || '0'}</span>
-            <div style={{ background: '#ff3b30', color: 'white', width: '20px', height: '20px', borderRadius: '50%', display: 'flex', justifyContent: 'center', alignItems: 'center', fontSize: '14px', cursor: 'pointer', marginLeft: '5px' }}>+</div>
           </div>
         </div>
 
@@ -219,7 +312,7 @@ function App() {
         </div>
 
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', zIndex: 10, marginBottom: '20px' }}>
-          <button onClick={() => setGameState('daily')} style={{ background: '#151515', border: '1px solid #333', borderRadius: '12px', padding: '15px 10px', color: 'white', display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer' }}>
+          <button onClick={openDaily} style={{ background: '#151515', border: '1px solid #333', borderRadius: '12px', padding: '15px 10px', color: 'white', display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer' }}>
             <span style={{ fontSize: '24px' }}>📅</span>
             <div style={{ textAlign: 'left' }}><div style={{ fontSize: '12px', fontWeight: 'bold' }}>Ежедневное</div><div style={{ fontSize: '10px', color: '#888' }}>задание</div></div>
           </button>
@@ -231,7 +324,7 @@ function App() {
 
         <div style={{ display: 'flex', justifyContent: 'space-between', padding: '15px 30px 0', borderTop: '1px solid #222', zIndex: 10 }}>
           <div onClick={() => setGameState('start')} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', color: '#ff3b30', cursor: 'pointer' }}><span style={{ fontSize: '22px' }}>🏠</span><span style={{ fontSize: '10px', marginTop: '4px', fontWeight: 'bold' }}>Главная</span></div>
-          <div onClick={openStats} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', color: '#555', cursor: 'pointer' }}><span style={{ fontSize: '22px' }}>📊</span><span style={{ fontSize: '10px', marginTop: '4px' }}>Статистика</span></div>
+          <div onClick={openStats} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', color: '#555', cursor: 'pointer' }}><span style={{ fontSize: '22px' }}>👤</span><span style={{ fontSize: '10px', marginTop: '4px' }}>Профиль</span></div>
           <div onClick={() => setGameState('settings')} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', color: '#555', cursor: 'pointer' }}><span style={{ fontSize: '22px' }}>⚙️</span><span style={{ fontSize: '10px', marginTop: '4px' }}>Настройки</span></div>
         </div>
       </div>
@@ -239,12 +332,12 @@ function App() {
   }
 
   // --- ЭКРАН: СТАТИСТИКА ---
-  if (gameState === 'stats') {
+  if (gameState === 'profile') {
     return (
-      <div style={{ minHeight: '100vh', background: '#0a0a0a', padding: '20px', display: 'flex', flexDirection: 'column' }}>
+      <div className="screen-enter" style={{ minHeight: '100vh', background: '#0a0a0a', padding: '20px', display: 'flex', flexDirection: 'column' }}>
         <div style={{ display: 'flex', alignItems: 'center', marginBottom: '30px' }}>
           <button onClick={() => setGameState('start')} style={{ background: 'transparent', border: 'none', color: 'white', fontSize: '24px', cursor: 'pointer', marginRight: '15px' }}>←</button>
-          <h2 style={{ fontSize: '20px', fontWeight: 'bold' }}>📊 Статистика</h2>
+          <h2 style={{ fontSize: '20px', fontWeight: 'bold' }}>👤 Профиль</h2>
         </div>
 
         <div style={{ background: 'radial-gradient(circle at top right, #3a0000, #151515)', borderRadius: '16px', padding: '20px', border: '1px solid #333', marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '15px' }}>
@@ -298,36 +391,44 @@ function App() {
   // --- ЭКРАН: ЕЖЕДНЕВНОЕ ЗАДАНИЕ ---
   if (gameState === 'daily') {
     return (
-      <div style={{ minHeight: '100vh', background: '#0a0a0a', padding: '20px', display: 'flex', flexDirection: 'column' }}>
+      <div className="screen-enter" style={{ minHeight: '100vh', background: '#0a0a0a', padding: '20px', display: 'flex', flexDirection: 'column', color: 'white' }}>
         <div style={{ display: 'flex', alignItems: 'center', marginBottom: '30px' }}>
           <button onClick={() => setGameState('start')} style={{ background: 'transparent', border: 'none', color: 'white', fontSize: '24px', cursor: 'pointer', marginRight: '15px' }}>←</button>
-          <h2 style={{ fontSize: '20px', fontWeight: 'bold' }}>📅 Ежедневный бонус</h2>
+          <h2 style={{ fontSize: '20px', fontWeight: 'bold' }}>📅 Задания</h2>
         </div>
 
-        <div style={{ textAlign: 'center', marginBottom: '30px' }}>
-          <p style={{ color: '#888', fontSize: '14px', marginBottom: '5px' }}>Заходи каждый день</p>
-          <p style={{ color: '#888', fontSize: '14px' }}>и получай награды!</p>
-        </div>
-
-        <div style={{ display: 'flex', gap: '8px', marginBottom: '30px', overflowX: 'auto' }}>
-          {[1, 2, 3, 4, 5].map((day) => (
-            <div key={day} style={{ 
-              minWidth: '65px', flex: 1, background: day === 1 ? 'radial-gradient(circle, #3a0000, #151515)' : '#151515', 
-              border: day === 1 ? '1px solid #ff3b30' : '1px solid #333', 
-              borderRadius: '12px', padding: '15px 5px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px' 
-            }}>
-              <span style={{ fontSize: '10px', color: '#888' }}>День {day}</span>
-              <span style={{ fontSize: '24px' }}>{day === 1 ? '🪙' : day === 2 ? '💎' : day === 3 ? '🪙' : day === 4 ? '💎' : '🪙'}</span>
-              <span style={{ fontSize: '12px', fontWeight: 'bold', color: day === 1 ? '#ff3b30' : 'white' }}>
-                {day === 1 ? '+100' : day === 2 ? '+1' : day === 3 ? '+200' : day === 4 ? '+2' : '+300'}
-              </span>
+        <div style={{ display: 'grid', gap: '12px' }}>
+          <div style={{ background: '#151515', border: '1px solid #333', borderRadius: '12px', padding: '18px', display: 'grid', gap: '14px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px' }}>
+              <div>
+                <div style={{ fontSize: '15px', fontWeight: 'bold' }}>Ежедневный бонус</div>
+                <div style={{ fontSize: '13px', color: '#aaa', marginTop: '5px' }}>Забирай 50 монет раз в день</div>
+              </div>
+              <span style={{ fontSize: '24px' }}>🪙</span>
             </div>
-          ))}
+            <button disabled={dailyClaimed || rewardLoading !== null} onClick={() => claimReward('daily')} style={{ width: '100%', padding: '14px', color: 'white', background: dailyClaimed ? '#252525' : '#ff3b30', borderRadius: '10px', border: 'none', fontWeight: 'bold', cursor: dailyClaimed || rewardLoading !== null ? 'default' : 'pointer', opacity: rewardLoading === 'daily' ? 0.7 : 1 }}>
+              {rewardLoading === 'daily' ? 'Проверяем...' : dailyClaimed ? 'Получено сегодня' : 'Забрать 50 монет'}
+            </button>
+          </div>
+
+          <div style={{ background: '#151515', border: '1px solid #333', borderRadius: '12px', padding: '18px', display: 'grid', gap: '14px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px' }}>
+              <div>
+                <div style={{ fontSize: '15px', fontWeight: 'bold' }}>Подписка на канал</div>
+                <div style={{ fontSize: '13px', color: '#aaa', marginTop: '5px' }}>Подпишись на @animequiznews и получи 100 монет</div>
+              </div>
+              <span style={{ fontSize: '24px' }}>📣</span>
+            </div>
+            <button onClick={openChannel} style={{ width: '100%', padding: '13px', color: 'white', background: '#242a31', borderRadius: '10px', border: '1px solid #3b4652', fontWeight: 'bold', cursor: 'pointer' }}>
+              Открыть канал
+            </button>
+            <button disabled={channelClaimed || rewardLoading !== null} onClick={() => claimReward('subscription')} style={{ width: '100%', padding: '14px', color: 'white', background: channelClaimed ? '#252525' : '#ff3b30', borderRadius: '10px', border: 'none', fontWeight: 'bold', cursor: channelClaimed || rewardLoading !== null ? 'default' : 'pointer', opacity: rewardLoading === 'subscription' ? 0.7 : 1 }}>
+              {rewardLoading === 'subscription' ? 'Проверяем подписку...' : channelClaimed ? 'Награда получена' : 'Проверить подписку'}
+            </button>
+          </div>
         </div>
 
-        <button style={{ width: '100%', padding: '18px', fontSize: '18px', fontWeight: 'bold', color: 'white', background: 'linear-gradient(135deg, #ff3b30, #cc0000)', borderRadius: '12px', border: 'none', cursor: 'pointer', boxShadow: '0 4px 15px rgba(255, 59, 48, 0.4)' }}>
-          Забрать награду
-        </button>
+        {rewardMessage && <p role="status" style={{ color: '#ccc', fontSize: '13px', lineHeight: '1.5', marginTop: '14px', textAlign: 'center' }}>{rewardMessage}</p>}
       </div>
     );
   }
@@ -335,7 +436,7 @@ function App() {
   // --- ЭКРАН: НАСТРОЙКИ ---
   if (gameState === 'settings') {
     return (
-      <div style={{ minHeight: '100vh', background: '#0a0a0a', padding: '20px', display: 'flex', flexDirection: 'column' }}>
+      <div className="screen-enter" style={{ minHeight: '100vh', background: '#0a0a0a', padding: '20px', display: 'flex', flexDirection: 'column' }}>
         <div style={{ display: 'flex', alignItems: 'center', marginBottom: '30px' }}>
           <button onClick={() => setGameState('start')} style={{ background: 'transparent', border: 'none', color: 'white', fontSize: '24px', cursor: 'pointer', marginRight: '15px' }}>←</button>
           <h2 style={{ fontSize: '20px', fontWeight: 'bold' }}>⚙️ Настройки</h2>
@@ -351,7 +452,7 @@ function App() {
   // --- ЭКРАН: ТАБЛИЦА ЛИДЕРОВ (пока заглушка) ---
   if (gameState === 'leaderboard') {
     return (
-      <div style={{ minHeight: '100vh', background: '#0a0a0a', padding: '20px', display: 'flex', flexDirection: 'column', color: 'white' }}>
+      <div className="screen-enter" style={{ minHeight: '100vh', background: '#0a0a0a', padding: '20px', display: 'flex', flexDirection: 'column', color: 'white' }}>
         <div style={{ display: 'flex', alignItems: 'center', marginBottom: '30px' }}>
           <button onClick={() => setGameState('start')} style={{ background: 'transparent', border: 'none', color: 'white', fontSize: '24px', cursor: 'pointer', marginRight: '15px' }}>←</button>
           <h2 style={{ fontSize: '20px', fontWeight: 'bold' }}>🏆 Таблица лидеров</h2>
@@ -396,7 +497,7 @@ function App() {
   // --- ЭКРАН 3: КОНЕЦ ИГРЫ ---
   if (gameState === 'end') {
     return (
-      <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', background: 'radial-gradient(circle at 50% 10%, #3a0000 0%, #0a0a0a 60%)', padding: '20px', alignItems: 'center', justifyContent: 'center' }}>
+      <div className="screen-enter" style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', background: 'radial-gradient(circle at 50% 10%, #3a0000 0%, #0a0a0a 60%)', padding: '20px', alignItems: 'center', justifyContent: 'center' }}>
         <div style={{ fontSize: '80px', marginBottom: '20px', filter: 'drop-shadow(0 0 20px rgba(255, 59, 48, 0.5))' }}>🏆</div>
         <h1 style={{ fontSize: '28px', fontWeight: 'bold', textAlign: 'center', marginBottom: '10px', lineHeight: '1.2' }}>Отличный<br/>результат!</h1>
         <p style={{ color: '#888', fontSize: '16px', marginBottom: '30px' }}>Ты угадал {score} из {questions.length}</p>
@@ -417,7 +518,7 @@ function App() {
 
   // --- ЭКРАН 2: ИГРА ---
   return (
-    <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', background: '#0a0a0a', padding: '20px', position: 'relative' }}>
+    <div className="screen-enter" style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', background: '#0a0a0a', padding: '20px', position: 'relative' }}>
       
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px' }}>
         <button onClick={() => setGameState('start')} style={{ background: 'transparent', border: 'none', color: 'white', fontSize: '24px', cursor: 'pointer' }}>←</button>
@@ -434,7 +535,7 @@ function App() {
         </div>
       </div>
 
-      <div style={{ width: '100%', height: '220px', borderRadius: '16px', overflow: 'hidden', marginBottom: '20px', border: '2px solid #333', position: 'relative' }}>
+      <div className="question-image-enter" style={{ width: '100%', height: '220px', borderRadius: '16px', overflow: 'hidden', marginBottom: '20px', border: '2px solid #333', position: 'relative' }}>
         <img src={question.image} alt="Кадр" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
         <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: '50%', background: 'linear-gradient(to top, rgba(0,0,0,0.8), transparent)' }}></div>
       </div>
@@ -444,6 +545,7 @@ function App() {
       <div style={{ display: 'grid', gap: '12px', flexGrow: 1 }}>
         {question.options.map((opt: string) => (
           <button 
+            className="answer-enter"
             key={opt} 
             onClick={() => handleAnswer(opt)}
             style={{ 

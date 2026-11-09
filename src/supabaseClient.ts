@@ -11,6 +11,8 @@ export type PlayerProfile = {
 	coins: number
 	total_wins: number
 	games_played: number
+	daily_claimed_on: string | null
+	subscription_reward_claimed: boolean
 	created_at: string
 }
 
@@ -34,6 +36,8 @@ type Database = {
 					coins?: number
 					total_wins?: number
 					games_played?: number
+					daily_claimed_on?: string | null
+					subscription_reward_claimed?: boolean
 					created_at?: string
 				}
 				Update: Partial<Omit<PlayerProfile, 'id' | 'created_at'>>
@@ -51,6 +55,14 @@ type Database = {
 			record_quiz_result: {
 				Args: { p_player_id: number; p_score: number }
 				Returns: PlayerProfile[]
+			}
+			claim_daily_reward: {
+				Args: { p_player_id: number }
+				Returns: { new_coins: number; claim_date: string; claimed: boolean }[]
+			}
+			claim_subscription_reward: {
+				Args: { p_player_id: number }
+				Returns: { new_coins: number; claimed: boolean }[]
 			}
 		}
 		Enums: Record<never, never>
@@ -79,7 +91,7 @@ export async function loadProfile(
 	const { data, error } = await supabase
 		.from('profiles')
 		.upsert({ id, first_name: firstName, username, photo_url: photoUrl }, { onConflict: 'id' })
-		.select('id, username, first_name, photo_url, coins, total_wins, games_played, created_at')
+		.select('id, username, first_name, photo_url, coins, total_wins, games_played, daily_claimed_on, subscription_reward_claimed, created_at')
 		.single()
 	if (error) throw error
 
@@ -129,7 +141,7 @@ export async function loadWeeklyActivity(playerId: number): Promise<WeeklyActivi
 export async function loadLeaderboard(): Promise<PlayerProfile[]> {
 	const { data, error } = await getClient()
 		.from('profiles')
-		.select('id, username, first_name, photo_url, coins, total_wins, games_played, created_at')
+		.select('id, username, first_name, photo_url, coins, total_wins, games_played, daily_claimed_on, subscription_reward_claimed, created_at')
 		.order('total_wins', { ascending: false })
 		.order('coins', { ascending: false })
 		.limit(100)
