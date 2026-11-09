@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
+import { supabase } from './supabaseClient';
 
-// Список твоих аниме. 
-// ВАЖНО: folder - это точное название папки в папке public!
 const animeList = [
   { folder: 'Атака титанов', correct: 'Атака титанов' },
   { folder: 'Бездомный бог', correct: 'Бездомный бог' },
@@ -20,49 +19,35 @@ const animeList = [
   { folder: 'Наруто', correct: 'Наруто' },
 ];
 
-const QUESTION_COUNT = 10; // Сколько вопросов будет в одной игре
+const QUESTION_COUNT = 10;
 
-// Функция для перемешивания массива
 const shuffle = (array: any[]) => [...array].sort(() => Math.random() - 0.5);
 
-// Генератор вопросов
 const generateQuestions = () => {
   const generatedQuestions: any[] = [];
   const usedAnime = new Set();
 
   for (let i = 0; i < QUESTION_COUNT; i++) {
     let selectedAnime;
-    
-    // Логика редкого повтора: 
-    // Если мы уже использовали все аниме, или случайно выпало 5% (Math.random() < 0.05), 
-    // то выбираем любое случайное аниме (может повториться).
-    // Иначе выбираем только из тех, кого еще не было.
     if (usedAnime.size >= animeList.length || Math.random() < 0.05) {
       selectedAnime = animeList[Math.floor(Math.random() * animeList.length)];
     } else {
       const availableAnime = animeList.filter(a => !usedAnime.has(a.correct));
       selectedAnime = availableAnime[Math.floor(Math.random() * availableAnime.length)];
     }
-
     usedAnime.add(selectedAnime.correct);
-
-    // Случайно берем 1 или 2 кадр
     const frame = Math.random() < 0.5 ? 1 : 2;
     
-    // Собираем варианты ответов
     const wrongOptions = animeList.filter(a => a.correct !== selectedAnime.correct);
     const shuffledWrong = shuffle(wrongOptions).slice(0, 3).map(a => a.correct);
-    
-    // Смешиваем правильный и 3 неправильных
     const options = shuffle([selectedAnime.correct, ...shuffledWrong]);
 
     generatedQuestions.push({
-      image: `/${selectedAnime.folder}/${frame}.png`, // Путь к картинке
+      image: `/${selectedAnime.folder}/${frame}.png`,
       options: options,
       correct: selectedAnime.correct,
     });
   }
-
   return generatedQuestions;
 };
 
@@ -75,10 +60,51 @@ function App() {
   const [selectedAnswer, setSelectedAnswer] = useState<string | null>(null);
   const [isCorrect, setIsCorrect] = useState(false);
   const [score, setScore] = useState(0);
-  const [coins, setCoins] = useState(4320);
   const [timeLeft, setTimeLeft] = useState(15);
+  
+  // Данные профиля
+  const [profile, setProfile] = useState<any>(null);
+  const [leaders, setLeaders] = useState<any[]>([]);
 
-  // При старте игры генерируем новые вопросы
+  // Загрузка профиля и лидеров при старте
+  useEffect(() => {
+    const initProfile = async () => {
+      const tg = (window as any).Telegram?.WebApp;
+      const user = tg?.initDataUnsafe?.user;
+      
+      if (!user) return;
+
+      // Ищем профиль
+      let { data, error } = await supabase.from('profiles').select('*').eq('id', user.id).single();
+
+      // Если нет - создаем
+      if (error && error.code === 'PGRST116') {
+        const { data: newProfile, error: insertError } = await supabase
+          .from('profiles')
+          .insert([{ 
+            id: user.id, 
+            username: user.username, 
+            first_name: user.first_name, 
+            photo_url: user.photo_url,
+            coins: 4320 
+          }])
+          .select()
+          .single();
+        if (!insertError) setProfile(newProfile);
+      } else if (data) {
+        setProfile(data);
+      }
+    };
+
+    const fetchLeaders = async () => {
+      const { data } = await supabase.from('profiles').select('*').order('coins', { ascending: false }).limit(10);
+      if (data) setLeaders(data);
+    };
+
+    initProfile();
+    fetchLeaders();
+  }, []);
+
   const startGame = () => {
     setQuestions(generateQuestions());
     setGameState('playing');
@@ -90,7 +116,6 @@ function App() {
 
   const question = questions[currentQuestionIndex];
 
-  // Логика таймера
   useEffect(() => {
     if (gameState !== 'playing' || selectedAnswer !== null) return;
     if (timeLeft === 0) {
@@ -105,23 +130,37 @@ function App() {
   const handleAnswer = (option: string) => {
     if (selectedAnswer !== null) return;
     setSelectedAnswer(option);
-    
     const correct = option === question.correct;
     setIsCorrect(correct);
-    
-    if (correct) {
-      setScore(score + 1);
-      setCoins(coins + 100);
-    }
+    if (correct) setScore(score + 1);
   };
 
-  const handleNextQuestion = () => {
+  const handleNextQuestion = async () => {
     if (currentQuestionIndex < questions.length - 1) {
       setCurrentQuestionIndex(currentQuestionIndex + 1);
       setSelectedAnswer(null);
       setTimeLeft(15);
     } else {
       setGameState('end');
+      
+      // Сохраняем результат в базу
+      if (profile) {
+        const addedCoins = score * 100;
+        const newCoins = profile.coins + addedCoins;
+        
+        await supabase.from('profiles').update({ 
+          coins: newCoins,
+          total_wins: profile.total_wins + score,
+          games_played: profile.games_played + 1
+        }).eq('id', profile.id);
+
+        // Обновляем локальный стейт, чтобы монеты сразу изменились на главной
+        setProfile({ ...profile, coins: newCoins, total_wins: profile.total_wins + score, games_played: profile.games_played + 1 });
+        
+        // Обновляем таблицу лидеров
+        const { data } = await supabase.from('profiles').select('*').order('coins', { ascending: false }).limit(10);
+        if (data) setLeaders(data);
+      }
     }
   };
 
@@ -144,7 +183,7 @@ function App() {
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', background: '#1c1c1e', padding: '8px 15px', borderRadius: '20px', border: '1px solid #333' }}>
             <span style={{ fontSize: '16px' }}>🪙</span>
-            <span style={{ fontSize: '14px', fontWeight: 'bold' }}>{coins.toLocaleString()}</span>
+            <span style={{ fontSize: '14px', fontWeight: 'bold' }}>{profile?.coins?.toLocaleString() || '0'}</span>
             <div style={{ background: '#ff3b30', color: 'white', width: '20px', height: '20px', borderRadius: '50%', display: 'flex', justifyContent: 'center', alignItems: 'center', fontSize: '14px', cursor: 'pointer', marginLeft: '5px' }}>+</div>
           </div>
         </div>
@@ -192,9 +231,13 @@ function App() {
         </div>
 
         <div style={{ background: 'radial-gradient(circle at top right, #3a0000, #151515)', borderRadius: '16px', padding: '20px', border: '1px solid #333', marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '15px' }}>
-          <div style={{ width: '60px', height: '60px', borderRadius: '50%', background: '#ff3b30', display: 'flex', justifyContent: 'center', alignItems: 'center', fontSize: '24px' }}>👤</div>
+          {profile?.photo_url ? (
+            <img src={profile.photo_url} alt="Avatar" style={{ width: '60px', height: '60px', borderRadius: '50%' }} />
+          ) : (
+            <div style={{ width: '60px', height: '60px', borderRadius: '50%', background: '#ff3b30', display: 'flex', justifyContent: 'center', alignItems: 'center', fontSize: '24px' }}>👤</div>
+          )}
           <div>
-            <div style={{ fontSize: '18px', fontWeight: 'bold' }}>Fayyy</div>
+            <div style={{ fontSize: '18px', fontWeight: 'bold' }}>{profile?.first_name || 'Игрок'}</div>
             <div style={{ fontSize: '12px', color: '#888' }}>Lv. 12 • 720 / 1500 EXP</div>
           </div>
         </div>
@@ -216,11 +259,11 @@ function App() {
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px', background: '#0a0a0a', padding: '10px', borderRadius: '12px' }}>
               <span style={{ fontSize: '24px' }}>🔥</span>
-              <div style={{ fontSize: '12px' }}>Побед: {score}</div>
+              <div style={{ fontSize: '12px' }}>Побед: {profile?.total_wins || 0}</div>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px', background: '#0a0a0a', padding: '10px', borderRadius: '12px' }}>
-              <span style={{ fontSize: '24px' }}>⏱</span>
-              <div style={{ fontSize: '12px' }}>Время: 12.5с</div>
+              <span style={{ fontSize: '24px' }}>🎮</span>
+              <div style={{ fontSize: '12px' }}>Игр: {profile?.games_played || 0}</div>
             </div>
           </div>
         </div>
@@ -283,14 +326,6 @@ function App() {
 
   // --- ЭКРАН: ТАБЛИЦА ЛИДЕРОВ ---
   if (gameState === 'leaderboard') {
-    const leaders = [
-      { name: 'AnimeMaster', score: 12450, avatar: 'https://i.pravatar.cc/150?img=11' },
-      { name: 'donkek', score: 11980, avatar: 'https://i.pravatar.cc/150?img=12' },
-      { name: 'senpai_228', score: 11760, avatar: 'https://i.pravatar.cc/150?img=13' },
-      { name: 'naruto_fan', score: 11420, avatar: 'https://i.pravatar.cc/150?img=14' },
-      { name: 'Sasuke_Kun', score: 10950, avatar: 'https://i.pravatar.cc/150?img=15' },
-    ];
-
     return (
       <div style={{ minHeight: '100vh', background: '#0a0a0a', padding: '20px', display: 'flex', flexDirection: 'column' }}>
         <div style={{ display: 'flex', alignItems: 'center', marginBottom: '30px' }}>
@@ -305,16 +340,22 @@ function App() {
         </div>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-          {leaders.map((leader, index) => (
-            <div key={index} style={{ display: 'flex', alignItems: 'center', background: '#151515', padding: '12px 15px', borderRadius: '12px', border: '1px solid #222' }}>
+          {leaders.length > 0 ? leaders.map((leader, index) => (
+            <div key={leader.id} style={{ display: 'flex', alignItems: 'center', background: leader.id === profile?.id ? '#2a1010' : '#151515', padding: '12px 15px', borderRadius: '12px', border: leader.id === profile?.id ? '1px solid #ff3b30' : '1px solid #222' }}>
               <div style={{ width: '30px', fontSize: '14px', fontWeight: 'bold', color: index === 0 ? '#ffcc00' : index === 1 ? '#c0c0c0' : index === 2 ? '#cd7f32' : '#555' }}>
                 {index + 1}
               </div>
-              <img src={leader.avatar} alt="avatar" style={{ width: '40px', height: '40px', borderRadius: '50%', marginRight: '15px' }} />
-              <div style={{ flexGrow: 1, fontSize: '14px', fontWeight: 'bold' }}>{leader.name}</div>
-              <div style={{ fontSize: '14px', color: '#888', fontWeight: 'bold' }}>{leader.score.toLocaleString()}</div>
+              {leader.photo_url ? (
+                <img src={leader.photo_url} alt="avatar" style={{ width: '40px', height: '40px', borderRadius: '50%', marginRight: '15px' }} />
+              ) : (
+                <div style={{ width: '40px', height: '40px', borderRadius: '50%', background: '#333', marginRight: '15px', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>👤</div>
+              )}
+              <div style={{ flexGrow: 1, fontSize: '14px', fontWeight: 'bold' }}>{leader.first_name || 'Игрок'}</div>
+              <div style={{ fontSize: '14px', color: '#888', fontWeight: 'bold' }}>{leader.coins.toLocaleString()} 🪙</div>
             </div>
-          ))}
+          )) : (
+            <div style={{ textAlign: 'center', color: '#888', marginTop: '20px' }}>Пока нет игроков...</div>
+          )}
         </div>
       </div>
     );
