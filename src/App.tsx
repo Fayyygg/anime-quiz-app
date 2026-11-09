@@ -1,25 +1,92 @@
 import { useState, useEffect } from 'react';
 
-// ВСТАВЛЕН ТВОЙ BLOCK ID ИЗ ADSGRAM
-const ADSGRAM_BLOCK_ID = "58781";
-
-const questions = [
-  { image: '/naruto.png', options: ['Наруто', 'Блич', 'Ван Пис', 'Атака Титанов'], correct: 'Наруто' },
-  { image: '/titan.png', options: ['Наруто', 'Блич', 'Ван Пис', 'Атака Титанов'], correct: 'Атака Титанов' },
-  { image: '/onepiece.png', options: ['Наруто', 'Блич', 'Ван Пис', 'Атака Титанов'], correct: 'Ван Пис' }
+// Список твоих аниме. 
+// ВАЖНО: folder - это точное название папки в папке public!
+const animeList = [
+  { folder: 'Атака титанов', correct: 'Атака титанов' },
+  { folder: 'Бездомный бог', correct: 'Бездомный бог' },
+  { folder: 'Берсерк', correct: 'Берсерк' },
+  { folder: 'Блич', correct: 'Блич' },
+  { folder: 'Вайолет Эвергарден', correct: 'Вайолет Эвергарден' },
+  { folder: 'Ван Пис', correct: 'Ван Пис' },
+  { folder: 'Ванпанчмен', correct: 'Ванпанчмен' },
+  { folder: 'Волейбол!!', correct: 'Волейбол!!' },
+  { folder: 'Восемьдесят Шесть', correct: 'Восемьдесят Шесть' },
+  { folder: 'Врата Штейна', correct: 'Врата Штейна' },
+  { folder: 'Город в котором меня нет', correct: 'Город в котором меня нет' },
+  { folder: 'Добро пожаловать в класс превосходства', correct: 'Добро пожаловать в класс превосходства' },
+  { folder: 'Доктор Стоун', correct: 'Доктор Стоун' },
+  { folder: 'Евангелион', correct: 'Евангелион' },
+  { folder: 'Наруто', correct: 'Наруто' },
 ];
+
+const QUESTION_COUNT = 10; // Сколько вопросов будет в одной игре
+
+// Функция для перемешивания массива
+const shuffle = (array: any[]) => [...array].sort(() => Math.random() - 0.5);
+
+// Генератор вопросов
+const generateQuestions = () => {
+  const generatedQuestions: any[] = [];
+  const usedAnime = new Set();
+
+  for (let i = 0; i < QUESTION_COUNT; i++) {
+    let selectedAnime;
+    
+    // Логика редкого повтора: 
+    // Если мы уже использовали все аниме, или случайно выпало 5% (Math.random() < 0.05), 
+    // то выбираем любое случайное аниме (может повториться).
+    // Иначе выбираем только из тех, кого еще не было.
+    if (usedAnime.size >= animeList.length || Math.random() < 0.05) {
+      selectedAnime = animeList[Math.floor(Math.random() * animeList.length)];
+    } else {
+      const availableAnime = animeList.filter(a => !usedAnime.has(a.correct));
+      selectedAnime = availableAnime[Math.floor(Math.random() * availableAnime.length)];
+    }
+
+    usedAnime.add(selectedAnime.correct);
+
+    // Случайно берем 1 или 2 кадр
+    const frame = Math.random() < 0.5 ? 1 : 2;
+    
+    // Собираем варианты ответов
+    const wrongOptions = animeList.filter(a => a.correct !== selectedAnime.correct);
+    const shuffledWrong = shuffle(wrongOptions).slice(0, 3).map(a => a.correct);
+    
+    // Смешиваем правильный и 3 неправильных
+    const options = shuffle([selectedAnime.correct, ...shuffledWrong]);
+
+    generatedQuestions.push({
+      image: `/${selectedAnime.folder}/${frame}.png`, // Путь к картинке
+      options: options,
+      correct: selectedAnime.correct,
+    });
+  }
+
+  return generatedQuestions;
+};
 
 type Screen = 'start' | 'playing' | 'end' | 'stats' | 'settings' | 'leaderboard' | 'daily';
 
 function App() {
   const [gameState, setGameState] = useState<Screen>('start');
+  const [questions, setQuestions] = useState<any[]>([]);
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [selectedAnswer, setSelectedAnswer] = useState<string | null>(null);
   const [isCorrect, setIsCorrect] = useState(false);
   const [score, setScore] = useState(0);
   const [coins, setCoins] = useState(4320);
   const [timeLeft, setTimeLeft] = useState(15);
-  const [hiddenOptions, setHiddenOptions] = useState<string[]>([]); // Для подсказок
+
+  // При старте игры генерируем новые вопросы
+  const startGame = () => {
+    setQuestions(generateQuestions());
+    setGameState('playing');
+    setCurrentQuestionIndex(0);
+    setSelectedAnswer(null);
+    setScore(0);
+    setTimeLeft(15);
+  };
 
   const question = questions[currentQuestionIndex];
 
@@ -34,15 +101,6 @@ function App() {
     const timerId = setTimeout(() => setTimeLeft(timeLeft - 1), 1000);
     return () => clearTimeout(timerId);
   }, [timeLeft, selectedAnswer, gameState]);
-
-  const startGame = () => {
-    setGameState('playing');
-    setCurrentQuestionIndex(0);
-    setSelectedAnswer(null);
-    setScore(0);
-    setTimeLeft(15);
-    setHiddenOptions([]); // Сбрасываем подсказки
-  };
 
   const handleAnswer = (option: string) => {
     if (selectedAnswer !== null) return;
@@ -62,30 +120,9 @@ function App() {
       setCurrentQuestionIndex(currentQuestionIndex + 1);
       setSelectedAnswer(null);
       setTimeLeft(15);
-      setHiddenOptions([]); // Сбрасываем подсказки для нового вопроса
     } else {
       setGameState('end');
     }
-  };
-
-  // --- ЛОГИКА РЕКЛАМЫ (ПОДСКАЗКИ) ---
-  const handleHint = () => {
-    const AdController = (window as any).Adsgram?.init({ blockId: ADSGRAM_BLOCK_ID });
-
-    if (!AdController) {
-      alert("Реклама пока не загрузилась. Попробуйте позже.");
-      return;
-    }
-
-    AdController.show().then((result: any) => {
-      if (result.done) {
-        // Если досмотрел - убираем 2 неправильных ответа
-        const wrongOptions = question.options.filter(opt => opt !== question.correct);
-        setHiddenOptions(wrongOptions.slice(0, 2));
-      }
-    }).catch((err: any) => {
-      console.log("Реклама не была досмотрена", err);
-    });
   };
 
   // --- ЭКРАН 1: ГЛАВНЫЙ ---
@@ -329,21 +366,26 @@ function App() {
         <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: '50%', background: 'linear-gradient(to top, rgba(0,0,0,0.8), transparent)' }}></div>
       </div>
 
-      <h2 style={{ fontSize: '20px', fontWeight: 'bold', textAlign: 'center', marginBottom: '25px', lineHeight: '1.3' }}>Из какого аниме<br/>этот персонаж?</h2>
+      <h2 style={{ fontSize: '20px', fontWeight: 'bold', textAlign: 'center', marginBottom: '25px', lineHeight: '1.3' }}>Из какого аниме<br/>этот кадр?</h2>
 
       <div style={{ display: 'grid', gap: '12px', flexGrow: 1 }}>
-        {question.options.map((opt) => {
-          if (hiddenOptions.includes(opt)) return null;
-          return (
-            <button key={opt} onClick={() => handleAnswer(opt)} style={{ padding: '18px 20px', fontSize: '16px', fontWeight: '600', color: 'white', background: '#151515', border: '1px solid #333', borderRadius: '12px', cursor: 'pointer', textAlign: 'center', transition: 'all 0.2s' }}>
-              {opt}
-            </button>
-          );
-        })}
+        {question.options.map((opt: string) => (
+          <button 
+            key={opt} 
+            onClick={() => handleAnswer(opt)}
+            style={{ 
+              padding: '18px 20px', fontSize: '16px', fontWeight: '600', color: 'white', 
+              background: '#151515', border: '1px solid #333', borderRadius: '12px', 
+              cursor: 'pointer', textAlign: 'center', transition: 'all 0.2s'
+            }}
+          >
+            {opt}
+          </button>
+        ))}
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginTop: '20px' }}>
-        <button onClick={handleHint} style={{ background: '#151515', border: '1px solid #ff3b30', borderRadius: '12px', padding: '15px', color: '#ff3b30', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', fontSize: '14px', fontWeight: 'bold', cursor: 'pointer' }}><span style={{ fontSize: '18px' }}>💡</span> Подсказка (Реклама)</button>
+        <button style={{ background: '#151515', border: '1px solid #ff3b30', borderRadius: '12px', padding: '15px', color: '#ff3b30', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', fontSize: '14px', fontWeight: 'bold', cursor: 'pointer' }}><span style={{ fontSize: '18px' }}>💡</span> Подсказка (Реклама)</button>
         <button style={{ background: '#151515', border: '1px solid #333', borderRadius: '12px', padding: '15px', color: '#888', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', fontSize: '14px', fontWeight: 'bold', cursor: 'pointer' }}><span style={{ fontSize: '18px' }}>⏭</span> Пропустить (100 🪙)</button>
       </div>
 
