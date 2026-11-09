@@ -1,5 +1,5 @@
 import { startTransition, useState, useEffect } from 'react';
-import { loadProfile, recordQuizResult, type PlayerProfile } from './supabaseClient';
+import { loadLeaderboard, loadProfile, recordQuizResult, type PlayerProfile } from './supabaseClient';
 
 const animeList = [
   { folder: 'Атака титанов', correct: 'Атака титанов' },
@@ -62,6 +62,9 @@ function App() {
   const [timeLeft, setTimeLeft] = useState(15);
   
   const [profile, setProfile] = useState<PlayerProfile | null>(null);
+  const [leaders, setLeaders] = useState<PlayerProfile[]>([]);
+  const [leaderboardLoading, setLeaderboardLoading] = useState(false);
+  const [leaderboardError, setLeaderboardError] = useState<string | null>(null);
 
   // Загрузка профиля из Telegram и Supabase
   useEffect(() => {
@@ -83,6 +86,21 @@ function App() {
       isMounted = false;
     };
   }, []);
+
+  const openLeaderboard = async () => {
+    setGameState('leaderboard');
+    setLeaderboardLoading(true);
+    setLeaderboardError(null);
+
+    try {
+      setLeaders(await loadLeaderboard());
+    } catch (err) {
+      console.error("Ошибка загрузки таблицы лидеров:", err);
+      setLeaderboardError('Не удалось загрузить игроков. Проверь доступ к таблице profiles в Supabase.');
+    } finally {
+      setLeaderboardLoading(false);
+    }
+  };
 
   const startGame = () => {
     setQuestions(generateQuestions());
@@ -178,7 +196,7 @@ function App() {
             <span style={{ fontSize: '24px' }}>📅</span>
             <div style={{ textAlign: 'left' }}><div style={{ fontSize: '12px', fontWeight: 'bold' }}>Ежедневное</div><div style={{ fontSize: '10px', color: '#888' }}>задание</div></div>
           </button>
-          <button onClick={() => setGameState('leaderboard')} style={{ background: '#151515', border: '1px solid #333', borderRadius: '12px', padding: '15px 10px', color: 'white', display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer' }}>
+          <button onClick={openLeaderboard} style={{ background: '#151515', border: '1px solid #333', borderRadius: '12px', padding: '15px 10px', color: 'white', display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer' }}>
             <span style={{ fontSize: '24px' }}>🏆</span>
             <div style={{ textAlign: 'left' }}><div style={{ fontSize: '12px', fontWeight: 'bold' }}>Таблица</div><div style={{ fontSize: '10px', color: '#888' }}>лидеров</div></div>
           </button>
@@ -295,14 +313,43 @@ function App() {
   // --- ЭКРАН: ТАБЛИЦА ЛИДЕРОВ (пока заглушка) ---
   if (gameState === 'leaderboard') {
     return (
-      <div style={{ minHeight: '100vh', background: '#0a0a0a', padding: '20px', display: 'flex', flexDirection: 'column' }}>
+      <div style={{ minHeight: '100vh', background: '#0a0a0a', padding: '20px', display: 'flex', flexDirection: 'column', color: 'white' }}>
         <div style={{ display: 'flex', alignItems: 'center', marginBottom: '30px' }}>
           <button onClick={() => setGameState('start')} style={{ background: 'transparent', border: 'none', color: 'white', fontSize: '24px', cursor: 'pointer', marginRight: '15px' }}>←</button>
           <h2 style={{ fontSize: '20px', fontWeight: 'bold' }}>🏆 Таблица лидеров</h2>
         </div>
-        <div style={{ flexGrow: 1, display: 'flex', justifyContent: 'center', alignItems: 'center', flexDirection: 'column', color: '#555' }}>
-          <span style={{ fontSize: '60px', marginBottom: '20px', opacity: 0.5 }}>🏆</span>
-          <p>Таблица лидеров скоро появится...</p>
+        <div style={{ color: '#888', fontSize: '13px', marginBottom: '16px' }}>Сортировка по правильным ответам</div>
+        <div style={{ flexGrow: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+          {leaderboardLoading && <p style={{ color: '#888', textAlign: 'center' }}>Загружаем игроков...</p>}
+          {leaderboardError && (
+            <div style={{ color: '#ff6b63', textAlign: 'center' }}>
+              <p>{leaderboardError}</p>
+              <button onClick={openLeaderboard} style={{ background: '#222', border: '1px solid #444', borderRadius: '8px', padding: '10px 16px', color: 'white', cursor: 'pointer' }}>Повторить</button>
+            </div>
+          )}
+          {!leaderboardLoading && !leaderboardError && leaders.length === 0 && (
+            <p style={{ color: '#888', textAlign: 'center' }}>Пока нет игроков с результатами.</p>
+          )}
+          {!leaderboardLoading && !leaderboardError && leaders.map((leader, index) => (
+            <div key={leader.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px', background: '#151515', border: '1px solid #2a2a2a', borderRadius: '10px', padding: '14px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px', minWidth: 0 }}>
+                <span style={{ color: index < 3 ? '#ffcc00' : '#888', fontWeight: 'bold', minWidth: '28px' }}>#{index + 1}</span>
+                {leader.photo_url ? (
+                  <img src={leader.photo_url} alt="" style={{ width: '36px', height: '36px', borderRadius: '50%', objectFit: 'cover' }} />
+                ) : (
+                  <span style={{ width: '36px', height: '36px', borderRadius: '50%', background: '#333', display: 'grid', placeItems: 'center' }}>👤</span>
+                )}
+                <div style={{ minWidth: 0 }}>
+                  <div style={{ fontWeight: 'bold', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{leader.first_name || leader.username || `Игрок ${leader.id}`}</div>
+                  {leader.username && <div style={{ color: '#777', fontSize: '12px' }}>@{leader.username}</div>}
+                </div>
+              </div>
+              <div style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
+                <div style={{ fontWeight: 'bold' }}>{leader.total_wins} очков</div>
+                <div style={{ color: '#ffcc00', fontSize: '12px' }}>🪙 {leader.coins.toLocaleString()}</div>
+              </div>
+            </div>
+          ))}
         </div>
       </div>
     );

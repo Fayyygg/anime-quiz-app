@@ -9,6 +9,8 @@ create table if not exists public.profiles (
   created_at timestamptz not null default timezone('utc'::text, now())
 );
 
+alter table public.profiles alter column coins set default 0;
+
 alter table public.profiles enable row level security;
 
 drop policy if exists "Public profiles are viewable by everyone." on public.profiles;

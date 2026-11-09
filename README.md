@@ -1,6 +1,6 @@
 # React + TypeScript + Vite
 ## Подключение Supabase
-1. Выполните `supabase/schema.sql` в SQL Editor. Таблица использует Telegram ID типа `bigint`.
+1. Выполните `supabase/schema.sql` в SQL Editor. Таблица использует Telegram ID типа `bigint`; новые профили получают 0 монет, существующие балансы не меняются.
 2. Скопируйте `.env.example` в `.env.local`, добавьте URL проекта и publishable/anon key.
 3. В Vercel добавьте те же `VITE_SUPABASE_URL` и `VITE_SUPABASE_ANON_KEY` в **Settings → Environment Variables** и запустите redeploy.
 

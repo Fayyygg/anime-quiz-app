@@ -84,3 +84,15 @@ export async function recordQuizResult(profile: PlayerProfile, score: number): P
 
 	return data
 }
+
+export async function loadLeaderboard(): Promise<PlayerProfile[]> {
+	const { data, error } = await getClient()
+		.from('profiles')
+		.select('id, username, first_name, photo_url, coins, total_wins, games_played, created_at')
+		.order('total_wins', { ascending: false })
+		.order('coins', { ascending: false })
+		.limit(100)
+	if (error) throw error
+
+	return data
+}
