@@ -1,15 +1,21 @@
-// @ts-ignore
 import React from 'react'
 import ReactDOM from 'react-dom/client'
 import App from './App.tsx'
 import './index.css'
 import { init, miniApp, themeParams, viewport } from '@telegram-apps/sdk-react';
 
+// Объявляем, что в window может быть объект Telegram
+declare global {
+  interface Window {
+    Telegram?: any;
+  }
+}
+
 const isTelegram = typeof window !== 'undefined' && window.Telegram?.WebApp?.initData !== undefined && window.Telegram.WebApp.initData !== '';
 
 async function initTelegram() {
   if (!isTelegram) {
-    console.log("Игра запущена в браузере. Инициализация Telegram пропущена.");
+    console.log("Игра запущена в браузере.");
     return;
   }
 
@@ -25,7 +31,7 @@ async function initTelegram() {
       viewport.expand.ifAvailable();
     }
   } catch (error) {
-    console.error("Ошибка при инициализации Telegram SDK:", error);
+    console.error("Ошибка Telegram SDK:", error);
   }
 }
 
