@@ -1,12 +1,10 @@
 # React + TypeScript + Vite
 ## Подключение Supabase
+1. Выполните `supabase/schema.sql` в SQL Editor. Таблица использует Telegram ID типа `bigint`.
+2. Скопируйте `.env.example` в `.env.local`, добавьте URL проекта и publishable/anon key.
+3. В Vercel добавьте те же `VITE_SUPABASE_URL` и `VITE_SUPABASE_ANON_KEY` в **Settings → Environment Variables** и запустите redeploy.
 
-1. В настройках Supabase включите анонимный вход: **Authentication → Sign In / Providers → Anonymous Sign-Ins**.
-2. Откройте **SQL Editor**, выполните содержимое `supabase/schema.sql`.
-3. Скопируйте `.env.example` в `.env.local` и укажите URL проекта и publishable/anon key из **Project Settings → API**.
-4. Перезапустите `npm run dev` после создания `.env.local`.
-
-Таблица профилей закрыта RLS-политиками: игрок может читать и создавать только собственную запись. Начисление за раунд выполняется SQL-функцией.
+Политики из этой схемы открывают чтение и изменение профилей всем посетителям. Для публичной игры их нельзя считать защитой: авторитетное начисление монет требует серверной проверки Telegram `initData`.
 
 
 This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.

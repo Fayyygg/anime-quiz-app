@@ -67,10 +67,13 @@ function App() {
   useEffect(() => {
     const tg = (window as any).Telegram?.WebApp;
     const user = tg?.initDataUnsafe?.user;
-    const userName = user ? user.first_name : "Тестер";
+    const userId = user?.id ?? 12345;
+    const userName = user?.first_name ?? "Тестер";
+    const username = user?.username ?? null;
+    const photoUrl = user?.photo_url ?? null;
     let isMounted = true;
 
-    loadProfile(userName)
+    loadProfile(userId, userName, username, photoUrl)
       .then(loadedProfile => {
         if (isMounted) startTransition(() => setProfile(loadedProfile));
       })
@@ -122,11 +125,13 @@ function App() {
       // Начисление награды в Supabase
       if (profile) {
         try {
-          setProfile(await recordQuizResult(score));
+          setProfile(await recordQuizResult(profile, score));
         } catch (err) {
           console.error("Ошибка сохранения результата:", err);
           alert("Не удалось сохранить результат. Проверь подключение к Supabase.");
         }
+      } else {
+        alert("Профиль не загружен, прогресс не сохранён. Проверь подключение к Supabase.");
       }
     }
   };
@@ -226,7 +231,7 @@ function App() {
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px', background: '#0a0a0a', padding: '10px', borderRadius: '12px' }}>
               <span style={{ fontSize: '24px' }}>🎮</span>
-              <div style={{ fontSize: '12px' }}>Игр: 0</div>
+              <div style={{ fontSize: '12px' }}>Игр: {profile?.games_played || 0}</div>
             </div>
           </div>
         </div>
