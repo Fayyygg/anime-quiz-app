@@ -1,5 +1,5 @@
 import { startTransition, useState, useEffect } from 'react';
-import { loadLeaderboard, loadProfile, recordQuizResult, type PlayerProfile } from './supabaseClient';
+import { loadLeaderboard, loadProfile, loadWeeklyActivity, recordQuizResult, type PlayerProfile, type WeeklyActivity } from './supabaseClient';
 
 const animeList = [
   { folder: 'Атака титанов', correct: 'Атака титанов' },
@@ -65,6 +65,9 @@ function App() {
   const [leaders, setLeaders] = useState<PlayerProfile[]>([]);
   const [leaderboardLoading, setLeaderboardLoading] = useState(false);
   const [leaderboardError, setLeaderboardError] = useState<string | null>(null);
+  const [weeklyActivity, setWeeklyActivity] = useState<WeeklyActivity[]>([]);
+  const [weeklyActivityLoading, setWeeklyActivityLoading] = useState(false);
+  const [weeklyActivityError, setWeeklyActivityError] = useState<string | null>(null);
 
   // Загрузка профиля из Telegram и Supabase
   useEffect(() => {
@@ -105,6 +108,26 @@ function App() {
     }
   };
 
+  const openStats = async () => {
+    setGameState('stats');
+    setWeeklyActivityError(null);
+    if (!profile) {
+      setWeeklyActivity([]);
+      setWeeklyActivityError('Профиль игрока не загружен.');
+      return;
+    }
+
+    setWeeklyActivityLoading(true);
+    try {
+      setWeeklyActivity(await loadWeeklyActivity(profile.id));
+    } catch (err) {
+      console.error("Ошибка загрузки активности:", err);
+      setWeeklyActivityError('Не удалось загрузить активность. Проверь таблицу quiz_activity в Supabase.');
+    } finally {
+      setWeeklyActivityLoading(false);
+    }
+  };
+
   const startGame = () => {
     setQuestions(generateQuestions());
     setGameState('playing');
@@ -115,6 +138,7 @@ function App() {
   };
 
   const question = questions[currentQuestionIndex];
+  const maxWeeklyGames = Math.max(1, ...weeklyActivity.map(day => day.games));
 
   useEffect(() => {
     if (gameState !== 'playing' || selectedAnswer !== null) return;
@@ -207,7 +231,7 @@ function App() {
 
         <div style={{ display: 'flex', justifyContent: 'space-between', padding: '15px 30px 0', borderTop: '1px solid #222', zIndex: 10 }}>
           <div onClick={() => setGameState('start')} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', color: '#ff3b30', cursor: 'pointer' }}><span style={{ fontSize: '22px' }}>🏠</span><span style={{ fontSize: '10px', marginTop: '4px', fontWeight: 'bold' }}>Главная</span></div>
-          <div onClick={() => setGameState('stats')} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', color: '#555', cursor: 'pointer' }}><span style={{ fontSize: '22px' }}>📊</span><span style={{ fontSize: '10px', marginTop: '4px' }}>Статистика</span></div>
+          <div onClick={openStats} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', color: '#555', cursor: 'pointer' }}><span style={{ fontSize: '22px' }}>📊</span><span style={{ fontSize: '10px', marginTop: '4px' }}>Статистика</span></div>
           <div onClick={() => setGameState('settings')} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', color: '#555', cursor: 'pointer' }}><span style={{ fontSize: '22px' }}>⚙️</span><span style={{ fontSize: '10px', marginTop: '4px' }}>Настройки</span></div>
         </div>
       </div>
@@ -236,15 +260,22 @@ function App() {
         </div>
 
         <div style={{ background: '#151515', borderRadius: '16px', padding: '20px', border: '1px solid #222', marginBottom: '20px' }}>
-          <div style={{ fontSize: '14px', fontWeight: 'bold', marginBottom: '20px' }}>Активность за неделю</div>
-          <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', height: '120px' }}>
-            {[40, 70, 30, 90, 50, 100, 60].map((height, i) => (
-              <div key={i} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', height: '100%', justifyContent: 'flex-end', gap: '8px' }}>
-                <div style={{ width: '25px', height: `${height}%`, background: i === 5 ? '#ff3b30' : '#333', borderRadius: '4px' }}></div>
-                <div style={{ fontSize: '10px', color: '#555' }}>{['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'][i]}</div>
-              </div>
-            ))}
-          </div>
+          <div style={{ fontSize: '14px', fontWeight: 'bold', marginBottom: '20px' }}>Завершённые игры за 7 дней</div>
+          {weeklyActivityLoading ? (
+            <p style={{ color: '#888', textAlign: 'center' }}>Загружаем активность...</p>
+          ) : weeklyActivityError ? (
+            <p style={{ color: '#ff6b63', textAlign: 'center' }}>{weeklyActivityError}</p>
+          ) : (
+            <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', height: '120px' }}>
+              {weeklyActivity.map(day => (
+                <div key={day.date} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', height: '100%', justifyContent: 'flex-end', gap: '8px' }}>
+                  <span style={{ fontSize: '10px', color: '#888' }}>{day.games}</span>
+                  <div style={{ width: '25px', height: `${day.games === 0 ? 2 : Math.max(8, (day.games / maxWeeklyGames) * 100)}%`, background: day.isToday ? '#ff3b30' : '#333', borderRadius: '4px' }}></div>
+                  <div style={{ fontSize: '10px', color: '#555' }}>{day.label}</div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
 
         <div style={{ background: '#151515', borderRadius: '16px', padding: '20px', border: '1px solid #222' }}>
