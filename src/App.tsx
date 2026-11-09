@@ -65,7 +65,7 @@ function App() {
   
   const [profile, setProfile] = useState<any>(null);
 
-  // Загрузка профиля (пока просто из Telegram)
+  // Загрузка профиля из Telegram
   useEffect(() => {
     const tg = (window as any).Telegram?.WebApp;
     const user = tg?.initDataUnsafe?.user;
@@ -125,7 +125,7 @@ function App() {
         const newWins = profile.total_wins + score;
 
         try {
-          await fetch(`${API_URL}/save`, {
+          const response = await fetch(`${API_URL}/save`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -135,10 +135,18 @@ function App() {
               total_wins: newWins
             })
           });
-          
-          setProfile({ ...profile, coins: newCoins, total_wins: newWins });
+
+          if (!response.ok) {
+            const errorText = await response.text();
+            console.error("Ошибка сервера:", response.status, errorText);
+            alert("Ошибка сохранения: " + errorText);
+          } else {
+            console.log("Успешно сохранено!");
+            setProfile({ ...profile, coins: newCoins, total_wins: newWins });
+          }
         } catch (e) {
-          console.error("Ошибка сохранения", e);
+          console.error("Ошибка сети:", e);
+          alert("Ошибка сети: " + e);
         }
       }
     }
