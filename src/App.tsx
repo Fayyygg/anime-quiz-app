@@ -61,6 +61,9 @@ function App() {
   const [isCorrect, setIsCorrect] = useState(false);
   const [score, setScore] = useState(0);
   const [timeLeft, setTimeLeft] = useState(15);
+  const [hintedOption, setHintedOption] = useState<string | null>(null);
+  const [hintLoading, setHintLoading] = useState(false);
+  const [hintMessage, setHintMessage] = useState<string | null>(null);
   const [profileLoading, setProfileLoading] = useState(hasTelegramUser);
   
   const [profile, setProfile] = useState<PlayerProfile | null>(null);
@@ -218,6 +221,8 @@ function App() {
     setSelectedAnswer(null);
     setScore(0);
     setTimeLeft(15);
+    setHintedOption(null);
+    setHintMessage(null);
   };
 
   const question = questions[currentQuestionIndex];
@@ -242,11 +247,55 @@ function App() {
     if (correct) setScore(score + 1);
   };
 
+  const handleHint = async () => {
+    if (!profile || hintedOption !== null || selectedAnswer !== null || hintLoading) return;
+    if (profile.coins < 150) {
+      setHintMessage('Для подсказки нужно 150 монет.');
+      return;
+    }
+
+    setHintLoading(true);
+    setHintMessage(null);
+    try {
+      const initData = (window as any).Telegram?.WebApp?.initData;
+      if (!initData) throw new Error('Открой игру через Telegram, чтобы купить подсказку.');
+
+      const response = await fetch('/api/rewards', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ initData, task: 'hint' }),
+      });
+      const result = await response.json() as { error?: string; coins?: number; spent?: boolean };
+      if (!response.ok) {
+        if (result.error === 'rewards_not_configured') throw new Error('Награды не настроены на сервере.');
+        throw new Error('Не удалось купить подсказку. Попробуй ещё раз.');
+      }
+      if (typeof result.coins !== 'number') throw new Error('Сервер вернул некорректный баланс.');
+
+      setProfile(current => current ? { ...current, coins: result.coins! } : current);
+      if (!result.spent) {
+        setHintMessage('Недостаточно монет для подсказки.');
+        return;
+      }
+
+      const wrongOptions = question.options.filter((option: string) => option !== question.correct);
+      const optionToRemove = wrongOptions[Math.floor(Math.random() * wrongOptions.length)];
+      setHintedOption(optionToRemove);
+    } catch (error) {
+      console.error('Ошибка покупки подсказки:', error);
+      setHintMessage('Не удалось применить подсказку. Попробуй ещё раз.');
+    } finally {
+      setHintLoading(false);
+    }
+  };
+
   const handleNextQuestion = async () => {
     if (currentQuestionIndex < questions.length - 1) {
       setCurrentQuestionIndex(currentQuestionIndex + 1);
       setSelectedAnswer(null);
       setTimeLeft(15);
+      setHintedOption(null);
+      setHintMessage(null);
     } else {
       setGameState('end');
       
@@ -545,8 +594,13 @@ function App() {
             <div style={{ width: `${((currentQuestionIndex + 1) / questions.length) * 100}%`, height: '100%', background: '#ff3b30', borderRadius: '3px' }}></div>
           </div>
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '5px', color: timeLeft <= 5 ? '#ff3b30' : '#34c759', fontWeight: 'bold', fontSize: '14px' }}>
-          ⏱ 00:{timeLeft < 10 ? `0${timeLeft}` : timeLeft}
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '5px', whiteSpace: 'nowrap' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '5px', color: '#ffcc00', fontWeight: 'bold', fontSize: '12px' }}>
+            🪙 {profile?.coins?.toLocaleString() ?? '0'}
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '5px', color: timeLeft <= 5 ? '#ff3b30' : '#34c759', fontWeight: 'bold', fontSize: '14px' }}>
+            ⏱ 00:{timeLeft < 10 ? `0${timeLeft}` : timeLeft}
+          </div>
         </div>
       </div>
 
@@ -558,7 +612,7 @@ function App() {
       <h2 style={{ fontSize: '20px', fontWeight: 'bold', textAlign: 'center', marginBottom: '25px', lineHeight: '1.3' }}>Из какого аниме<br/>этот кадр?</h2>
 
       <div style={{ display: 'grid', gap: '12px', flexGrow: 1 }}>
-        {question.options.map((opt: string) => (
+        {question.options.filter((opt: string) => opt !== hintedOption).map((opt: string) => (
           <button 
             className="answer-enter"
             key={opt} 
@@ -574,9 +628,11 @@ function App() {
         ))}
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginTop: '20px' }}>
-        <button style={{ background: '#151515', border: '1px solid #ff3b30', borderRadius: '12px', padding: '15px', color: '#ff3b30', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', fontSize: '14px', fontWeight: 'bold', cursor: 'pointer' }}><span style={{ fontSize: '18px' }}>💡</span> Подсказка (Реклама)</button>
-        <button style={{ background: '#151515', border: '1px solid #333', borderRadius: '12px', padding: '15px', color: '#888', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', fontSize: '14px', fontWeight: 'bold', cursor: 'pointer' }}><span style={{ fontSize: '18px' }}>⏭</span> Пропустить (100 🪙)</button>
+      <div style={{ display: 'grid', gap: '8px', marginTop: '20px' }}>
+        <button disabled={hintLoading || hintedOption !== null || selectedAnswer !== null} onClick={handleHint} style={{ background: hintedOption !== null ? '#252525' : '#151515', border: '1px solid #ff3b30', borderRadius: '12px', padding: '15px', color: hintedOption !== null ? '#888' : '#ff6b63', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', fontSize: '14px', fontWeight: 'bold', cursor: hintLoading || hintedOption !== null || selectedAnswer !== null ? 'default' : 'pointer', opacity: hintLoading ? 0.7 : 1 }}>
+          <span style={{ fontSize: '18px' }}>💡</span> {hintedOption !== null ? 'Подсказка использована' : hintLoading ? 'Применяем...' : 'Убрать вариант · 150 🪙'}
+        </button>
+        {hintMessage && <p role="status" style={{ color: '#ff9b94', fontSize: '12px', textAlign: 'center' }}>{hintMessage}</p>}
       </div>
 
       {selectedAnswer !== null && (

@@ -105,6 +105,37 @@ $$;
 revoke all on function public.record_quiz_result(bigint, integer) from public;
 grant execute on function public.record_quiz_result(bigint, integer) to anon, authenticated;
 
+create or replace function public.spend_quiz_hint(p_player_id bigint)
+returns table (new_coins integer, spent boolean)
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  updated_coins integer;
+begin
+  update public.profiles as p
+  set coins = p.coins - 150
+  where p.id = p_player_id
+    and p.coins >= 150
+  returning p.coins into updated_coins;
+
+  if found then
+    return query select updated_coins, true;
+    return;
+  end if;
+
+  return query
+    select p.coins, false
+    from public.profiles as p
+    where p.id = p_player_id;
+end;
+$$;
+
+revoke all on function public.spend_quiz_hint(bigint) from public;
+revoke all on function public.spend_quiz_hint(bigint) from anon, authenticated;
+grant execute on function public.spend_quiz_hint(bigint) to service_role;
+
 create or replace function public.claim_daily_reward(p_player_id bigint)
 returns table (new_coins integer, claim_date date, claimed boolean)
 language plpgsql

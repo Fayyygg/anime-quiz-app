@@ -17,6 +17,10 @@ type RewardsDatabase = {
 				Args: { p_player_id: number }
 				Returns: { new_coins: number; claimed: boolean }[]
 			}
+			spend_quiz_hint: {
+				Args: { p_player_id: number }
+				Returns: { new_coins: number; spent: boolean }[]
+			}
 		}
 		Enums: Record<never, never>
 		CompositeTypes: Record<never, never>
@@ -83,7 +87,7 @@ export default async function handler(request: RequestWithBody, response: Server
 
 	try {
 		const body = await readBody(request) as { initData?: unknown; task?: unknown }
-		if (typeof body.initData !== 'string' || (body.task !== 'daily' && body.task !== 'subscription')) {
+		if (typeof body.initData !== 'string' || !['daily', 'subscription', 'hint'].includes(String(body.task))) {
 			return sendJson(response, 400, { error: 'invalid_request' })
 		}
 
@@ -127,6 +131,20 @@ export default async function handler(request: RequestWithBody, response: Server
 				coins: result.data.new_coins,
 				daily_claimed_on: result.data.claim_date,
 				claimed: result.data.claimed,
+			})
+		}
+		if (body.task === 'hint') {
+			const result = await supabase.rpc('spend_quiz_hint', { p_player_id: user.id }).single()
+			if (result.error) {
+				console.error('Hint purchase failed:', result.error.message)
+				return sendJson(response, 500, { error: 'hint_purchase_failed' })
+			}
+			if (!result.data) return sendJson(response, 404, { error: 'profile_not_found' })
+
+			return sendJson(response, 200, {
+				task: 'hint',
+				coins: result.data.new_coins,
+				spent: result.data.spent,
 			})
 		}
 
