@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 
 const questions = [
   { image: '/naruto.png', options: ['Наруто', 'Блич', 'Ван Пис', 'Атака Титанов'], correct: 'Наруто' },
@@ -6,39 +6,54 @@ const questions = [
   { image: '/onepiece.png', options: ['Наруто', 'Блич', 'Ван Пис', 'Атака Титанов'], correct: 'Ван Пис' }
 ];
 
+type Screen = 'start' | 'playing' | 'end' | 'stats' | 'settings' | 'leaderboard' | 'daily';
+
 function App() {
-  const [gameState, setGameState] = useState<'start' | 'playing' | 'end'>('start');
+  const [gameState, setGameState] = useState<Screen>('start');
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [selectedAnswer, setSelectedAnswer] = useState<string | null>(null);
   const [isCorrect, setIsCorrect] = useState(false);
-  const [score, setScore] = useState(0); // Реальный счет
+  const [score, setScore] = useState(0);
+  const [timeLeft, setTimeLeft] = useState(15); // Таймер
 
   const question = questions[currentQuestionIndex];
+
+  // Логика таймера
+  useEffect(() => {
+    if (gameState !== 'playing' || selectedAnswer !== null) return;
+
+    if (timeLeft === 0) {
+      setSelectedAnswer("Время вышло");
+      setIsCorrect(false);
+      return;
+    }
+
+    const timerId = setTimeout(() => setTimeLeft(timeLeft - 1), 1000);
+    return () => clearTimeout(timerId);
+  }, [timeLeft, selectedAnswer, gameState]);
 
   const startGame = () => {
     setGameState('playing');
     setCurrentQuestionIndex(0);
     setSelectedAnswer(null);
-    setScore(0); // Сбрасываем счет при старте
+    setScore(0);
+    setTimeLeft(15);
   };
 
   const handleAnswer = (option: string) => {
-    if (selectedAnswer !== null) return; // Защита от двойного клика
+    if (selectedAnswer !== null) return;
     setSelectedAnswer(option);
     
     const correct = option === question.correct;
     setIsCorrect(correct);
-    
-    // Добавляем очко, если ответ верный
-    if (correct) {
-      setScore(score + 1);
-    }
+    if (correct) setScore(score + 1);
   };
 
   const handleNextQuestion = () => {
     if (currentQuestionIndex < questions.length - 1) {
       setCurrentQuestionIndex(currentQuestionIndex + 1);
       setSelectedAnswer(null);
+      setTimeLeft(15);
     } else {
       setGameState('end');
     }
@@ -78,10 +93,40 @@ function App() {
           </button>
         </div>
 
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', zIndex: 10, marginBottom: '20px' }}>
+          <button onClick={() => setGameState('daily')} style={{ background: '#151515', border: '1px solid #333', borderRadius: '12px', padding: '15px 10px', color: 'white', display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer' }}>
+            <span style={{ fontSize: '24px' }}>📅</span>
+            <div style={{ textAlign: 'left' }}><div style={{ fontSize: '12px', fontWeight: 'bold' }}>Ежедневное</div><div style={{ fontSize: '10px', color: '#888' }}>задание</div></div>
+          </button>
+          <button onClick={() => setGameState('leaderboard')} style={{ background: '#151515', border: '1px solid #333', borderRadius: '12px', padding: '15px 10px', color: 'white', display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer' }}>
+            <span style={{ fontSize: '24px' }}>🏆</span>
+            <div style={{ textAlign: 'left' }}><div style={{ fontSize: '12px', fontWeight: 'bold' }}>Таблица</div><div style={{ fontSize: '10px', color: '#888' }}>лидеров</div></div>
+          </button>
+        </div>
+
         <div style={{ display: 'flex', justifyContent: 'space-between', padding: '15px 30px 0', borderTop: '1px solid #222', zIndex: 10 }}>
-          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', color: '#ff3b30' }}><span style={{ fontSize: '22px' }}>🏠</span><span style={{ fontSize: '10px', marginTop: '4px', fontWeight: 'bold' }}>Главная</span></div>
-          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', color: '#555' }}><span style={{ fontSize: '22px' }}>📊</span><span style={{ fontSize: '10px', marginTop: '4px' }}>Статистика</span></div>
-          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', color: '#555' }}><span style={{ fontSize: '22px' }}>⚙️</span><span style={{ fontSize: '10px', marginTop: '4px' }}>Настройки</span></div>
+          <div onClick={() => setGameState('start')} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', color: '#ff3b30', cursor: 'pointer' }}><span style={{ fontSize: '22px' }}>🏠</span><span style={{ fontSize: '10px', marginTop: '4px', fontWeight: 'bold' }}>Главная</span></div>
+          <div onClick={() => setGameState('stats')} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', color: '#555', cursor: 'pointer' }}><span style={{ fontSize: '22px' }}>📊</span><span style={{ fontSize: '10px', marginTop: '4px' }}>Статистика</span></div>
+          <div onClick={() => setGameState('settings')} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', color: '#555', cursor: 'pointer' }}><span style={{ fontSize: '22px' }}>⚙️</span><span style={{ fontSize: '10px', marginTop: '4px' }}>Настройки</span></div>
+        </div>
+      </div>
+    );
+  }
+
+  // --- ЭКРАНЫ ЗАГЛУШКИ ---
+  if (['stats', 'settings', 'leaderboard', 'daily'].includes(gameState)) {
+    const titles: any = { stats: 'Статистика', settings: 'Настройки', leaderboard: 'Таблица лидеров', daily: 'Ежедневное задание' };
+    const icons: any = { stats: '📊', settings: '⚙️', leaderboard: '🏆', daily: '📅' };
+    
+    return (
+      <div style={{ minHeight: '100vh', background: '#0a0a0a', padding: '20px', display: 'flex', flexDirection: 'column' }}>
+        <div style={{ display: 'flex', alignItems: 'center', marginBottom: '30px' }}>
+          <button onClick={() => setGameState('start')} style={{ background: 'transparent', border: 'none', color: 'white', fontSize: '24px', cursor: 'pointer', marginRight: '15px' }}>←</button>
+          <h2 style={{ fontSize: '20px', fontWeight: 'bold' }}>{icons[gameState]} {titles[gameState]}</h2>
+        </div>
+        <div style={{ flexGrow: 1, display: 'flex', justifyContent: 'center', alignItems: 'center', flexDirection: 'column', color: '#555' }}>
+          <span style={{ fontSize: '60px', marginBottom: '20px', opacity: 0.5 }}>{icons[gameState]}</span>
+          <p>Этот раздел скоро появится...</p>
         </div>
       </div>
     );
@@ -91,47 +136,20 @@ function App() {
   if (gameState === 'end') {
     return (
       <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', background: 'radial-gradient(circle at 50% 10%, #3a0000 0%, #0a0a0a 60%)', padding: '20px', alignItems: 'center', justifyContent: 'center' }}>
-        
         <div style={{ fontSize: '80px', marginBottom: '20px', filter: 'drop-shadow(0 0 20px rgba(255, 59, 48, 0.5))' }}>🏆</div>
-
         <h1 style={{ fontSize: '28px', fontWeight: 'bold', textAlign: 'center', marginBottom: '10px', lineHeight: '1.2' }}>Отличный<br/>результат!</h1>
-        
-        {/* Реальный счет */}
-        <p style={{ color: '#888', fontSize: '16px', marginBottom: '30px' }}>
-          Ты угадал {score} из {questions.length}
-        </p>
-
+        <p style={{ color: '#888', fontSize: '16px', marginBottom: '30px' }}>Ты угадал {score} из {questions.length}</p>
         <div style={{ display: 'flex', gap: '15px', marginBottom: '40px' }}>
           <div style={{ background: '#1c1c1e', padding: '10px 20px', borderRadius: '12px', display: 'flex', alignItems: 'center', gap: '8px', border: '1px solid #333' }}>
-            <span>🪙</span> <span style={{ color: '#ffcc00', fontWeight: 'bold' }}>+300</span>
-          </div>
-          <div style={{ background: '#1c1c1e', padding: '10px 20px', borderRadius: '12px', display: 'flex', alignItems: 'center', gap: '8px', border: '1px solid #333' }}>
-            <span>⭐</span> <span style={{ color: '#ff3b30', fontWeight: 'bold' }}>+150</span>
+            <span>🪙</span> <span style={{ color: '#ffcc00', fontWeight: 'bold' }}>+{score * 100}</span>
           </div>
         </div>
-
         <div style={{ width: '100%', background: '#151515', borderRadius: '16px', padding: '20px', border: '1px solid #222', marginBottom: '30px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '15px', fontSize: '14px', fontWeight: 'bold' }}>
-            <span style={{ color: '#ff3b30' }}>📊</span> Твоя статистика:
-          </div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '10px', fontSize: '14px' }}>
-            <span style={{ color: '#888' }}>Лучший результат</span>
-            {/* Тоже выводим реальный счет */}
-            <span style={{ fontWeight: 'bold' }}>{score} / {questions.length}</span>
-          </div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px' }}>
-            <span style={{ color: '#888' }}>Среднее время</span>
-            <span style={{ fontWeight: 'bold' }}>12.5 сек</span>
-          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '15px', fontSize: '14px', fontWeight: 'bold' }}><span style={{ color: '#ff3b30' }}>📊</span> Твоя статистика:</div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '10px', fontSize: '14px' }}><span style={{ color: '#888' }}>Результат</span><span style={{ fontWeight: 'bold' }}>{score} / {questions.length}</span></div>
         </div>
-
-        <button onClick={startGame} style={{ width: '100%', padding: '18px', fontSize: '18px', fontWeight: 'bold', color: 'white', background: '#ff3b30', borderRadius: '12px', border: 'none', cursor: 'pointer', boxShadow: '0 4px 15px rgba(255, 59, 48, 0.4)', marginBottom: '15px', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '10px' }}>
-          <span style={{ fontSize: '20px' }}>🔄</span> Играть снова
-        </button>
-
-        <button onClick={() => setGameState('start')} style={{ width: '100%', padding: '18px', fontSize: '18px', fontWeight: 'bold', color: 'white', background: '#151515', borderRadius: '12px', border: '1px solid #333', cursor: 'pointer', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '10px' }}>
-          <span style={{ fontSize: '20px' }}>🏠</span> На главную
-        </button>
+        <button onClick={startGame} style={{ width: '100%', padding: '18px', fontSize: '18px', fontWeight: 'bold', color: 'white', background: '#ff3b30', borderRadius: '12px', border: 'none', cursor: 'pointer', boxShadow: '0 4px 15px rgba(255, 59, 48, 0.4)', marginBottom: '15px', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '10px' }}><span style={{ fontSize: '20px' }}>🔄</span> Играть снова</button>
+        <button onClick={() => setGameState('start')} style={{ width: '100%', padding: '18px', fontSize: '18px', fontWeight: 'bold', color: 'white', background: '#151515', borderRadius: '12px', border: '1px solid #333', cursor: 'pointer', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '10px' }}><span style={{ fontSize: '20px' }}>🏠</span> На главную</button>
       </div>
     );
   }
@@ -150,7 +168,10 @@ function App() {
             <div style={{ width: `${((currentQuestionIndex + 1) / questions.length) * 100}%`, height: '100%', background: '#ff3b30', borderRadius: '3px' }}></div>
           </div>
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '5px', color: '#ff3b30', fontWeight: 'bold', fontSize: '14px' }}>⏱ 00:15</div>
+        {/* Таймер вернулся! */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '5px', color: timeLeft <= 5 ? '#ff3b30' : '#34c759', fontWeight: 'bold', fontSize: '14px' }}>
+          ⏱ 00:{timeLeft < 10 ? `0${timeLeft}` : timeLeft}
+        </div>
       </div>
 
       <div style={{ width: '100%', height: '220px', borderRadius: '16px', overflow: 'hidden', marginBottom: '20px', border: '2px solid #333', position: 'relative' }}>
@@ -198,9 +219,6 @@ function App() {
             <div style={{ display: 'flex', gap: '15px', marginBottom: '40px' }}>
               <div style={{ background: '#1c1c1e', padding: '10px 20px', borderRadius: '12px', display: 'flex', alignItems: 'center', gap: '8px', border: '1px solid #333' }}>
                 <span>🪙</span> <span style={{ color: '#34c759', fontWeight: 'bold' }}>+100</span>
-              </div>
-              <div style={{ background: '#1c1c1e', padding: '10px 20px', borderRadius: '12px', display: 'flex', alignItems: 'center', gap: '8px', border: '1px solid #333' }}>
-                <span style={{ color: '#ff3b30' }}>EXP</span> <span style={{ color: '#34c759', fontWeight: 'bold' }}>+50</span>
               </div>
             </div>
           )}
