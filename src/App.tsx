@@ -70,13 +70,16 @@ function App() {
   useEffect(() => {
     const tg = (window as any).Telegram?.WebApp;
     const user = tg?.initDataUnsafe?.user;
-    const userId = user?.id ?? 12345;
-    const userName = user?.first_name ?? "Тестер";
-    const username = user?.username ?? null;
-    const photoUrl = user?.photo_url ?? null;
     let isMounted = true;
 
-    loadProfile(userId, userName, username, photoUrl)
+    if (!user) {
+      console.warn("Telegram user is unavailable; profile will not be created.");
+      return () => {
+        isMounted = false;
+      };
+    }
+
+    loadProfile(user.id, user.first_name, user.username ?? null, user.photo_url ?? null)
       .then(loadedProfile => {
         if (isMounted) startTransition(() => setProfile(loadedProfile));
       })
