@@ -1,7 +1,5 @@
-import { useState, useEffect } from 'react';
-
-// ВСТАВЬ СЮДА ССЫЛКУ ОТ API GATEWAY (из Yandex Cloud)
-const API_URL = "https://d5dru6dtks9bgq58s6gg.4kscn31j.apigw.yandexcloud.net"; 
+import { startTransition, useState, useEffect } from 'react';
+import { loadProfile, recordQuizResult, type PlayerProfile } from './supabaseClient';
 
 const animeList = [
   { folder: 'Атака титанов', correct: 'Атака титанов' },
@@ -63,31 +61,24 @@ function App() {
   const [score, setScore] = useState(0);
   const [timeLeft, setTimeLeft] = useState(15);
   
-  const [profile, setProfile] = useState<any>(null);
+  const [profile, setProfile] = useState<PlayerProfile | null>(null);
 
-  // Загрузка профиля из Telegram и базы данных Yandex
+  // Загрузка профиля из Telegram и Supabase
   useEffect(() => {
     const tg = (window as any).Telegram?.WebApp;
     const user = tg?.initDataUnsafe?.user;
-    
-    // Если мы в браузере (для теста), используем ID 12345
-    const userId = user ? user.id : 12345;
     const userName = user ? user.first_name : "Тестер";
+    let isMounted = true;
 
-    // Сначала ставим базовые данные
-    setProfile({ id: userId, first_name: userName, coins: 0, total_wins: 0 });
-
-    // Затем запрашиваем актуальные монеты из API
-    fetch(`${API_URL}/get?id=${userId}`)
-      .then(res => res.json())
-      .then(data => {
-        setProfile((prev: any) => ({ 
-          ...prev, 
-          coins: data.coins || 0, 
-          total_wins: data.total_wins || 0 
-        }));
+    loadProfile(userName)
+      .then(loadedProfile => {
+        if (isMounted) startTransition(() => setProfile(loadedProfile));
       })
       .catch(err => console.error("Ошибка загрузки профиля:", err));
+
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
   const startGame = () => {
@@ -128,35 +119,13 @@ function App() {
     } else {
       setGameState('end');
       
-      // Отправка результата на сервер Yandex
+      // Начисление награды в Supabase
       if (profile) {
-        const addedCoins = score * 100;
-        const newCoins = profile.coins + addedCoins;
-        const newWins = profile.total_wins + score;
-
         try {
-          const response = await fetch(`${API_URL}/save`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              id: profile.id,
-              first_name: profile.first_name,
-              coins: newCoins,
-              total_wins: newWins
-            })
-          });
-
-          if (!response.ok) {
-            const errorText = await response.text();
-            console.error("Ошибка сервера:", response.status, errorText);
-            alert("Ошибка сохранения: " + errorText);
-          } else {
-            console.log("Успешно сохранено!");
-            setProfile({ ...profile, coins: newCoins, total_wins: newWins });
-          }
-        } catch (e) {
-          console.error("Ошибка сети:", e);
-          alert("Ошибка сети: " + e);
+          setProfile(await recordQuizResult(score));
+        } catch (err) {
+          console.error("Ошибка сохранения результата:", err);
+          alert("Не удалось сохранить результат. Проверь подключение к Supabase.");
         }
       }
     }

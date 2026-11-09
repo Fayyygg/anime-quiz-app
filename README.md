@@ -1,4 +1,13 @@
 # React + TypeScript + Vite
+## Подключение Supabase
+
+1. В настройках Supabase включите анонимный вход: **Authentication → Sign In / Providers → Anonymous Sign-Ins**.
+2. Откройте **SQL Editor**, выполните содержимое `supabase/schema.sql`.
+3. Скопируйте `.env.example` в `.env.local` и укажите URL проекта и publishable/anon key из **Project Settings → API**.
+4. Перезапустите `npm run dev` после создания `.env.local`.
+
+Таблица профилей закрыта RLS-политиками: игрок может читать и создавать только собственную запись. Начисление за раунд выполняется SQL-функцией.
+
 
 This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
 
