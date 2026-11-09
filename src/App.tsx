@@ -1,5 +1,7 @@
 import { useState, useEffect } from 'react';
-import { supabase } from './supabaseClient';
+
+// ВСТАВЬ СЮДА ССЫЛКУ ОТ API GATEWAY (из Yandex Cloud)
+const API_URL = "https://d5dru6dtks9bgq58s6gg.4kscn31j.apigw.yandexcloud.net"; 
 
 const animeList = [
   { folder: 'Атака титанов', correct: 'Атака титанов' },
@@ -62,47 +64,22 @@ function App() {
   const [score, setScore] = useState(0);
   const [timeLeft, setTimeLeft] = useState(15);
   
-  // Данные профиля
   const [profile, setProfile] = useState<any>(null);
-  const [leaders, setLeaders] = useState<any[]>([]);
+  const [leaders, setLeaders] = useState<any[]>([]); // Пока оставим пустым, так как нет базы для лидеров
 
-  // Загрузка профиля и лидеров при старте
+  // Загрузка профиля из Telegram
   useEffect(() => {
-    const initProfile = async () => {
-      const tg = (window as any).Telegram?.WebApp;
-      const user = tg?.initDataUnsafe?.user;
-      
-      if (!user) return;
-
-      // Ищем профиль
-      let { data, error } = await supabase.from('profiles').select('*').eq('id', user.id).single();
-
-      // Если нет - создаем
-      if (error && error.code === 'PGRST116') {
-        const { data: newProfile, error: insertError } = await supabase
-          .from('profiles')
-          .insert([{ 
-            id: user.id, 
-            username: user.username, 
-            first_name: user.first_name, 
-            photo_url: user.photo_url,
-            coins: 4320 
-          }])
-          .select()
-          .single();
-        if (!insertError) setProfile(newProfile);
-      } else if (data) {
-        setProfile(data);
-      }
-    };
-
-    const fetchLeaders = async () => {
-      const { data } = await supabase.from('profiles').select('*').order('coins', { ascending: false }).limit(10);
-      if (data) setLeaders(data);
-    };
-
-    initProfile();
-    fetchLeaders();
+    const tg = (window as any).Telegram?.WebApp;
+    const user = tg?.initDataUnsafe?.user;
+    
+    if (user) {
+      setProfile({
+        id: user.id,
+        first_name: user.first_name,
+        coins: 0, // Тут должны быть данные из базы, но у нас пока нет функции загрузки
+        total_wins: 0
+      });
+    }
   }, []);
 
   const startGame = () => {
@@ -143,23 +120,29 @@ function App() {
     } else {
       setGameState('end');
       
-      // Сохраняем результат в базу
+      // Отправка результата на сервер Yandex
       if (profile) {
         const addedCoins = score * 100;
         const newCoins = profile.coins + addedCoins;
-        
-        await supabase.from('profiles').update({ 
-          coins: newCoins,
-          total_wins: profile.total_wins + score,
-          games_played: profile.games_played + 1
-        }).eq('id', profile.id);
+        const newWins = profile.total_wins + score;
 
-        // Обновляем локальный стейт, чтобы монеты сразу изменились на главной
-        setProfile({ ...profile, coins: newCoins, total_wins: profile.total_wins + score, games_played: profile.games_played + 1 });
-        
-        // Обновляем таблицу лидеров
-        const { data } = await supabase.from('profiles').select('*').order('coins', { ascending: false }).limit(10);
-        if (data) setLeaders(data);
+        try {
+          await fetch(`${API_URL}/save`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              id: profile.id,
+              first_name: profile.first_name,
+              coins: newCoins,
+              total_wins: newWins
+            })
+          });
+          
+          // Обновляем локальный стейт, чтобы монеты сразу отобразились
+          setProfile({ ...profile, coins: newCoins, total_wins: newWins });
+        } catch (e) {
+          console.error("Ошибка сохранения", e);
+        }
       }
     }
   };
@@ -231,11 +214,7 @@ function App() {
         </div>
 
         <div style={{ background: 'radial-gradient(circle at top right, #3a0000, #151515)', borderRadius: '16px', padding: '20px', border: '1px solid #333', marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '15px' }}>
-          {profile?.photo_url ? (
-            <img src={profile.photo_url} alt="Avatar" style={{ width: '60px', height: '60px', borderRadius: '50%' }} />
-          ) : (
-            <div style={{ width: '60px', height: '60px', borderRadius: '50%', background: '#ff3b30', display: 'flex', justifyContent: 'center', alignItems: 'center', fontSize: '24px' }}>👤</div>
-          )}
+          <div style={{ width: '60px', height: '60px', borderRadius: '50%', background: '#ff3b30', display: 'flex', justifyContent: 'center', alignItems: 'center', fontSize: '24px' }}>👤</div>
           <div>
             <div style={{ fontSize: '18px', fontWeight: 'bold' }}>{profile?.first_name || 'Игрок'}</div>
             <div style={{ fontSize: '12px', color: '#888' }}>Lv. 12 • 720 / 1500 EXP</div>
@@ -263,7 +242,7 @@ function App() {
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px', background: '#0a0a0a', padding: '10px', borderRadius: '12px' }}>
               <span style={{ fontSize: '24px' }}>🎮</span>
-              <div style={{ fontSize: '12px' }}>Игр: {profile?.games_played || 0}</div>
+              <div style={{ fontSize: '12px' }}>Игр: 0</div>
             </div>
           </div>
         </div>
@@ -324,7 +303,7 @@ function App() {
     );
   }
 
-  // --- ЭКРАН: ТАБЛИЦА ЛИДЕРОВ ---
+  // --- ЭКРАН: ТАБЛИЦА ЛИДЕРОВ (пока заглушка) ---
   if (gameState === 'leaderboard') {
     return (
       <div style={{ minHeight: '100vh', background: '#0a0a0a', padding: '20px', display: 'flex', flexDirection: 'column' }}>
@@ -332,30 +311,9 @@ function App() {
           <button onClick={() => setGameState('start')} style={{ background: 'transparent', border: 'none', color: 'white', fontSize: '24px', cursor: 'pointer', marginRight: '15px' }}>←</button>
           <h2 style={{ fontSize: '20px', fontWeight: 'bold' }}>🏆 Таблица лидеров</h2>
         </div>
-
-        <div style={{ display: 'flex', gap: '10px', marginBottom: '20px' }}>
-          <div style={{ padding: '8px 15px', background: '#ff3b30', color: 'white', borderRadius: '20px', fontSize: '12px', fontWeight: 'bold' }}>Все игроки</div>
-          <div style={{ padding: '8px 15px', background: '#151515', color: '#888', borderRadius: '20px', fontSize: '12px', border: '1px solid #333' }}>Друзья</div>
-          <div style={{ padding: '8px 15px', background: '#151515', color: '#888', borderRadius: '20px', fontSize: '12px', border: '1px solid #333' }}>Неделя</div>
-        </div>
-
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-          {leaders.length > 0 ? leaders.map((leader, index) => (
-            <div key={leader.id} style={{ display: 'flex', alignItems: 'center', background: leader.id === profile?.id ? '#2a1010' : '#151515', padding: '12px 15px', borderRadius: '12px', border: leader.id === profile?.id ? '1px solid #ff3b30' : '1px solid #222' }}>
-              <div style={{ width: '30px', fontSize: '14px', fontWeight: 'bold', color: index === 0 ? '#ffcc00' : index === 1 ? '#c0c0c0' : index === 2 ? '#cd7f32' : '#555' }}>
-                {index + 1}
-              </div>
-              {leader.photo_url ? (
-                <img src={leader.photo_url} alt="avatar" style={{ width: '40px', height: '40px', borderRadius: '50%', marginRight: '15px' }} />
-              ) : (
-                <div style={{ width: '40px', height: '40px', borderRadius: '50%', background: '#333', marginRight: '15px', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>👤</div>
-              )}
-              <div style={{ flexGrow: 1, fontSize: '14px', fontWeight: 'bold' }}>{leader.first_name || 'Игрок'}</div>
-              <div style={{ fontSize: '14px', color: '#888', fontWeight: 'bold' }}>{leader.coins.toLocaleString()} 🪙</div>
-            </div>
-          )) : (
-            <div style={{ textAlign: 'center', color: '#888', marginTop: '20px' }}>Пока нет игроков...</div>
-          )}
+        <div style={{ flexGrow: 1, display: 'flex', justifyContent: 'center', alignItems: 'center', flexDirection: 'column', color: '#555' }}>
+          <span style={{ fontSize: '60px', marginBottom: '20px', opacity: 0.5 }}>🏆</span>
+          <p>Таблица лидеров скоро появится...</p>
         </div>
       </div>
     );
