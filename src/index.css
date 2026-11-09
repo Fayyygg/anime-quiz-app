@@ -15,6 +15,32 @@ body {
   overflow-x: hidden;
 }
 
+button,
+.nav-action {
+  -webkit-tap-highlight-color: transparent;
+  transform-origin: center;
+  transition: transform 140ms ease, filter 140ms ease, box-shadow 140ms ease;
+}
+
+button:active,
+.nav-action:active {
+  transform: scale(0.97);
+  filter: brightness(0.9);
+}
+
+button:focus-visible,
+.nav-action:focus-visible {
+  outline: 2px solid #ff6b63;
+  outline-offset: 3px;
+}
+
+.nav-action {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  font: inherit;
+}
+
 .loading-screen {
   min-height: 100vh;
   display: flex;
@@ -111,6 +137,7 @@ body {
   *, *::before, *::after {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
   }
 }

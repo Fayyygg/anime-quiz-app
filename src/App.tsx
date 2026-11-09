@@ -323,9 +323,9 @@ function App() {
         </div>
 
         <div style={{ display: 'flex', justifyContent: 'space-between', padding: '15px 30px 0', borderTop: '1px solid #222', zIndex: 10 }}>
-          <div onClick={() => setGameState('start')} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', color: '#ff3b30', cursor: 'pointer' }}><span style={{ fontSize: '22px' }}>🏠</span><span style={{ fontSize: '10px', marginTop: '4px', fontWeight: 'bold' }}>Главная</span></div>
-          <div onClick={openStats} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', color: '#555', cursor: 'pointer' }}><span style={{ fontSize: '22px' }}>👤</span><span style={{ fontSize: '10px', marginTop: '4px' }}>Профиль</span></div>
-          <div onClick={() => setGameState('settings')} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', color: '#555', cursor: 'pointer' }}><span style={{ fontSize: '22px' }}>⚙️</span><span style={{ fontSize: '10px', marginTop: '4px' }}>Настройки</span></div>
+          <button type="button" className="nav-action" onClick={() => setGameState('start')} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', color: '#ff3b30', cursor: 'pointer' }}><span style={{ fontSize: '22px' }}>🏠</span><span style={{ fontSize: '10px', marginTop: '4px', fontWeight: 'bold' }}>Главная</span></button>
+          <button type="button" className="nav-action" onClick={openStats} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', color: '#555', cursor: 'pointer' }}><span style={{ fontSize: '22px' }}>👤</span><span style={{ fontSize: '10px', marginTop: '4px' }}>Профиль</span></button>
+          <button type="button" className="nav-action" onClick={() => setGameState('settings')} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', color: '#555', cursor: 'pointer' }}><span style={{ fontSize: '22px' }}>⚙️</span><span style={{ fontSize: '10px', marginTop: '4px' }}>Настройки</span></button>
         </div>
       </div>
     );
@@ -535,7 +535,7 @@ function App() {
         </div>
       </div>
 
-      <div className="question-image-enter" style={{ width: '100%', height: '220px', borderRadius: '16px', overflow: 'hidden', marginBottom: '20px', border: '2px solid #333', position: 'relative' }}>
+      <div key={question.image} className="question-image-enter" style={{ width: '100%', height: '220px', borderRadius: '16px', overflow: 'hidden', marginBottom: '20px', border: '2px solid #333', position: 'relative' }}>
         <img src={question.image} alt="Кадр" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
         <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: '50%', background: 'linear-gradient(to top, rgba(0,0,0,0.8), transparent)' }}></div>
       </div>
