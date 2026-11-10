@@ -1,40 +1,37 @@
-# React + TypeScript + Vite
-## Подключение Supabase
-1. Выполните обновлённый `supabase/schema.sql` в SQL Editor. Он добавит поля и функции ежедневных заданий, не сбрасывая ненулевые балансы.
-2. В Vercel → **Settings → Environment Variables** задайте `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`, `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` и `TELEGRAM_BOT_TOKEN`.
-3. Добавьте Telegram-бота администратором канала `@animequiznews`, иначе Telegram не позволит проверять подписчиков.
-4. Запустите новый deploy Vercel после добавления переменных.
+# Anime Quiz App
 
-Ежедневный бонус составляет 50 монет и доступен раз в UTC-день. Награда за подтверждённую подписку — 100 монет один раз на игрока. Секреты `SUPABASE_SERVICE_ROLE_KEY` и `TELEGRAM_BOT_TOKEN` используются только Vercel API и никогда не должны иметь префикс `VITE_`.
+Телеграм-игра «Угадай аниме». Открывай через бота в Telegram и проверяй свои знания аниме.
 
+## Как играть
 
-This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
+1. Открой игру в Telegram (Mini App через бота).
+2. Нажми **«Начать игру»**.
+3. Тебе покажут картинку из аниме и 4 варианта ответа. Угадай название аниме за 15 секунд.
+4. За каждый правильный ответ получаешь **100 монет**.
+5. Пройди все 10 вопросов и посмотри финальный результат.
+6. Соревнуйся с другими игроками в таблице лидеров.
 
-Currently, two official plugins are available:
+## Бонусы
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+- **Ежедневный бонус** — 50 монет раз в сутки (UTC).
+- **Подписка на канал** — 100 монет один раз за подписку на канал `@animequiznews`.
+- **Подсказка** — убери один неверный вариант за 150 монет.
 
-## React Compiler
+## Профиль
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+Посмотри баланс монет, количество сыгранных викторин и недельную активность во вкладке профиля.
 
-## Expanding the Oxlint configuration
+## Связь
 
-If you are developing a production application, we recommend enabling type-aware lint rules by installing `oxlint-tsgolint` and editing `.oxlintrc.json`:
+Если есть вопросы, идеи или нашёл баг — пиши в Telegram: [@Fayyy1lv](https://t.me/Fayyy1lv)
 
-```json
-{
-  "$schema": "./node_modules/oxlint/configuration_schema.json",
-  "plugins": ["react", "typescript", "oxc"],
-  "options": {
-    "typeAware": true
-  },
-  "rules": {
-    "react/rules-of-hooks": "error",
-    "react/only-export-components": ["warn", { "allowConstantExport": true }]
-  }
-}
+## Технологии
+
+React + TypeScript + Vite, Supabase, Telegram Web Apps.
+
+## Запуск локально
+
+```bash
+npm install
+npm run dev
 ```
-
-See the [Oxlint rules documentation](https://oxc.rs/docs/guide/usage/linter/rules) for the full list of rules and categories.
